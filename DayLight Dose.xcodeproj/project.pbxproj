@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		5D2D70992E261F2600C099C6 /* DayLight Dose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DayLight Dose.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A12F9582E27FAE10015755B /* DayLight Dose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DayLight Dose.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,16 +33,8 @@
 			isa = PBXGroup;
 			children = (
 				5D2D709B2E261F2600C099C6 /* DayLight Dose */,
-				5D2D709A2E261F2600C099C6 /* Products */,
+				2A12F9582E27FAE10015755B /* DayLight Dose.app */,
 			);
-			sourceTree = "<group>";
-		};
-		5D2D709A2E261F2600C099C6 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				5D2D70992E261F2600C099C6 /* DayLight Dose.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -66,7 +58,7 @@
 			packageProductDependencies = (
 			);
 			productName = "DayLight Dose";
-			productReference = 5D2D70992E261F2600C099C6 /* DayLight Dose.app */;
+			productReference = 2A12F9582E27FAE10015755B /* DayLight Dose.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -94,7 +86,7 @@
 			mainGroup = 5D2D70902E261F2600C099C6;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 5D2D709A2E261F2600C099C6 /* Products */;
+			productRefGroup = 5D2D70902E261F2600C099C6;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -240,13 +232,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "DayLight Dose/DayLight Dose.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5R6ZLNA7FA;
+				DEVELOPMENT_TEAM = SGZM8678SV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "DayLight-Dose-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "DayLight Dose";
+				INFOPLIST_KEY_CFBundleDisplayName = "Daylight Dose";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "DayLight Dose reads your health data to provide personalized vitamin D recommendations";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "DayLight Dose saves your vitamin D intake data to Health app";
@@ -261,7 +254,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.galgotias.DayLight-Dose";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.galgotias.DayLight-Dose.1";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -278,13 +271,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "DayLight Dose/DayLight Dose.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5R6ZLNA7FA;
+				DEVELOPMENT_TEAM = SGZM8678SV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "DayLight-Dose-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "DayLight Dose";
+				INFOPLIST_KEY_CFBundleDisplayName = "Daylight Dose";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "DayLight Dose reads your health data to provide personalized vitamin D recommendations";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "DayLight Dose saves your vitamin D intake data to Health app";
@@ -299,7 +293,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.galgotias.DayLight-Dose";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.galgotias.DayLight-Dose.1";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
