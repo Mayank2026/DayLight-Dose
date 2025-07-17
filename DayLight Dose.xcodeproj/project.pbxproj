@@ -6,14 +6,73 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5D9194852E281B0000D08D3F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D9194842E281B0000D08D3F /* WidgetKit.framework */; };
+		5D9194872E281B0000D08D3F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D9194862E281B0000D08D3F /* SwiftUI.framework */; };
+		5D9194922E281B0200D08D3F /* DayLightDoseExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5D9194822E281B0000D08D3F /* DayLightDoseExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5D9194902E281B0200D08D3F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5D2D70912E261F2600C099C6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5D9194812E281B0000D08D3F;
+			remoteInfo = DayLightDoseExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5D9194972E281B0200D08D3F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5D9194922E281B0200D08D3F /* DayLightDoseExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		5D2D70992E261F2600C099C6 /* DayLight Dose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DayLight Dose.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A12F9582E27FAE10015755B /* DayLight Dose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DayLight Dose.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D9194822E281B0000D08D3F /* DayLightDoseExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DayLightDoseExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D9194842E281B0000D08D3F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		5D9194862E281B0000D08D3F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5D9194932E281B0200D08D3F /* Exceptions for "DayLightDose" folder in "DayLightDoseExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5D9194812E281B0000D08D3F /* DayLightDoseExtension */;
+		};
+		5D91949E2E281B9600D08D3F /* Exceptions for "DayLightDose" folder in "DayLight Dose" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				DayLightDose.intentdefinition,
+			);
+			target = 5D2D70982E261F2600C099C6 /* DayLight Dose */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5D2D709B2E261F2600C099C6 /* DayLight Dose */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "DayLight Dose";
+			sourceTree = "<group>";
+		};
+		5D9194882E281B0000D08D3F /* DayLightDose */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5D91949E2E281B9600D08D3F /* Exceptions for "DayLightDose" folder in "DayLight Dose" target */,
+				5D9194932E281B0200D08D3F /* Exceptions for "DayLightDose" folder in "DayLightDoseExtension" target */,
+			);
+			path = DayLightDose;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,6 +85,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5D91947F2E281B0000D08D3F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D9194872E281B0000D08D3F /* SwiftUI.framework in Frameworks */,
+				5D9194852E281B0000D08D3F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -33,16 +101,28 @@
 			isa = PBXGroup;
 			children = (
 				5D2D709B2E261F2600C099C6 /* DayLight Dose */,
-				5D2D709A2E261F2600C099C6 /* Products */,
+				5D9194982E281B1200D08D3F /* Products */,
+				5D9194882E281B0000D08D3F /* DayLightDose */,
+				5D9194832E281B0000D08D3F /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
-		5D2D709A2E261F2600C099C6 /* Products */ = {
+		5D9194832E281B0000D08D3F /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				5D2D70992E261F2600C099C6 /* DayLight Dose.app */,
+				5D9194842E281B0000D08D3F /* WidgetKit.framework */,
+				5D9194862E281B0000D08D3F /* SwiftUI.framework */,
 			);
-			name = Products;
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		5D9194982E281B1200D08D3F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2A12F9582E27FAE10015755B /* DayLight Dose.app */,
+				5D9194822E281B0000D08D3F /* DayLightDoseExtension.appex */,
+			);
+			path = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -54,11 +134,12 @@
 			buildPhases = (
 				5D2D70952E261F2600C099C6 /* Sources */,
 				5D2D70962E261F2600C099C6 /* Frameworks */,
-				5D2D70972E261F2600C099C6 /* Resources */,
+				5D9194972E281B0200D08D3F /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				5D9194912E281B0200D08D3F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				5D2D709B2E261F2600C099C6 /* DayLight Dose */,
@@ -67,8 +148,30 @@
 			packageProductDependencies = (
 			);
 			productName = "DayLight Dose";
-			productReference = 5D2D70992E261F2600C099C6 /* DayLight Dose.app */;
+			productReference = 2A12F9582E27FAE10015755B /* DayLight Dose.app */;
 			productType = "com.apple.product-type.application";
+		};
+		5D9194812E281B0000D08D3F /* DayLightDoseExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D9194942E281B0200D08D3F /* Build configuration list for PBXNativeTarget "DayLightDoseExtension" */;
+			buildPhases = (
+				5D91947E2E281B0000D08D3F /* Sources */,
+				5D91947F2E281B0000D08D3F /* Frameworks */,
+				5D9194802E281B0000D08D3F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5D9194882E281B0000D08D3F /* DayLightDose */,
+			);
+			name = DayLightDoseExtension;
+			packageProductDependencies = (
+			);
+			productName = DayLightDoseExtension;
+			productReference = 5D9194822E281B0000D08D3F /* DayLightDoseExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -83,6 +186,9 @@
 					5D2D70982E261F2600C099C6 = {
 						CreatedOnToolsVersion = 16.4;
 					};
+					5D9194812E281B0000D08D3F = {
+						CreatedOnToolsVersion = 16.4;
+					};
 				};
 			};
 			buildConfigurationList = 5D2D70942E261F2600C099C6 /* Build configuration list for PBXProject "DayLight Dose" */;
@@ -95,17 +201,18 @@
 			mainGroup = 5D2D70902E261F2600C099C6;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 5D2D709A2E261F2600C099C6 /* Products */;
+			productRefGroup = 5D2D70902E261F2600C099C6;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				5D2D70982E261F2600C099C6 /* DayLight Dose */,
+				5D9194812E281B0000D08D3F /* DayLightDoseExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		5D2D70972E261F2600C099C6 /* Resources */ = {
+		5D9194802E281B0000D08D3F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +229,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5D91947E2E281B0000D08D3F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5D9194912E281B0200D08D3F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5D9194812E281B0000D08D3F /* DayLightDoseExtension */;
+			targetProxy = 5D9194902E281B0200D08D3F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5D2D70A22E261F2800C099C6 /* Debug */ = {
@@ -251,26 +373,38 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = "DayLight Dose/DayLight Dose.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5R6ZLNA7FA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = "DayLight-Dose-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Daylight Dose";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "DayLight Dose reads your health data to provide personalized vitamin D recommendations";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "DayLight Dose saves your vitamin D intake data to Health app";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "DayLight Dose needs your location to track UV exposure throughout the day";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DayLight Dose needs your location to determine UV levels at your current position";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.galgotias.DayLight-Dose";
+				PRODUCT_BUNDLE_IDENTIFIER = com.galgotias.mayank;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -279,23 +413,91 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = "DayLight Dose/DayLight Dose.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5R6ZLNA7FA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = "DayLight-Dose-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Daylight Dose";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "DayLight Dose reads your health data to provide personalized vitamin D recommendations";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "DayLight Dose saves your vitamin D intake data to Health app";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "DayLight Dose needs your location to track UV exposure throughout the day";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DayLight Dose needs your location to determine UV levels at your current position";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.galgotias.DayLight-Dose";
+				PRODUCT_BUNDLE_IDENTIFIER = com.galgotias.mayank;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		5D9194952E281B0200D08D3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = DayLightDoseExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5R6ZLNA7FA;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DayLightDose/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DayLightDose;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.galgotias.mayank.DayLightDose;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5D9194962E281B0200D08D3F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = DayLightDoseExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5R6ZLNA7FA;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DayLightDose/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DayLightDose;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.galgotias.mayank.DayLightDose;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -319,6 +521,15 @@
 			buildConfigurations = (
 				5D2D70A52E261F2800C099C6 /* Debug */,
 				5D2D70A62E261F2800C099C6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5D9194942E281B0200D08D3F /* Build configuration list for PBXNativeTarget "DayLightDoseExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D9194952E281B0200D08D3F /* Debug */,
+				5D9194962E281B0200D08D3F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
