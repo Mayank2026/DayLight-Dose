@@ -229,7 +229,7 @@ struct AnalyzeSessionView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) { // Reduced spacing between title and card
+            VStack(spacing: 28) { // Reduced spacing between title and card
                 // Title above the card
                 Text("Session Details")
                     .font(.system(size: 24, weight: .bold))
@@ -304,7 +304,7 @@ struct AnalyzeSessionView: View {
                 .cornerRadius(16)
                 .frame(maxWidth: 500)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 40)
+                .padding(.top, 16)
 
                 // Analysis button (not inside a card)
                 Button(action: {
