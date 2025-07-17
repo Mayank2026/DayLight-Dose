@@ -13,9 +13,21 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                backgroundGradient
+        ZStack {
+            backgroundGradient
+            VStack(spacing: 0) {
+                // Header (like LearnView)
+                HStack {
+                    Text("Settings")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 10)
+                
+                // Main content
                 List {
                     Section("Personal Information") {
                         if let prefs = preferences {
@@ -66,12 +78,8 @@ struct SettingsView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .navigationTitle("Settings")
                 .foregroundColor(.white)
-                .navigationBarTitleDisplayMode(.large)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-                .toolbarBackground(Color.clear, for: .navigationBar)
+                .listStyle(.insetGrouped)
             }
             .sheet(isPresented: $showingOnboarding) {
                 HealthInsightsPreferencesView()
@@ -89,12 +97,6 @@ struct SettingsView: View {
                 }
             }
             .onAppear {
-                let appearance = UINavigationBarAppearance()
-                appearance.configureWithTransparentBackground()
-                appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-                appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-                UINavigationBar.appearance().standardAppearance = appearance
-                UINavigationBar.appearance().scrollEdgeAppearance = appearance
                 currentGradientColors = gradientColors
             }
         }

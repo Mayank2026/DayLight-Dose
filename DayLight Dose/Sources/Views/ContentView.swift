@@ -37,41 +37,42 @@ struct ContentView: View {
             backgroundGradient
             
             GeometryReader { geometry in
-                if uvService.hasNoData {
-                    // No data available view
-                    VStack(spacing: 20) {
-                        Image(systemName: "wifi.slash")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white.opacity(0.6))
-                        
-                        Text("No Data Available")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundColor(.white)
-                        
-                        Text("Connect to the internet to fetch UV data")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-                        
-                        if locationManager.location != nil {
-                            Button(action: {
-                                if let location = locationManager.location {
-                                    uvService.fetchUVData(for: location)
+                ScrollView {
+                    if uvService.hasNoData {
+                        // No data available view
+                        VStack(spacing: 20) {
+                            Image(systemName: "wifi.slash")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white.opacity(0.6))
+                            
+                            Text("No Data Available")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.white)
+                            
+                            Text("Connect to the internet to fetch UV data")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                            
+                            if locationManager.location != nil {
+                                Button(action: {
+                                    if let location = locationManager.location {
+                                        uvService.fetchUVData(for: location)
+                                    }
+                                }) {
+                                    Text("Retry")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 30)
+                                        .padding(.vertical, 12)
+                                        .background(Color.white.opacity(0.2))
+                                        .cornerRadius(25)
                                 }
-                            }) {
-                                Text("Retry")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 30)
-                                    .padding(.vertical, 12)
-                                    .background(Color.white.opacity(0.2))
-                                    .cornerRadius(25)
                             }
                         }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.bottom, 80) // Add bottom padding for tab bar
+                    } else {
                         VStack(spacing: 20) {
                             headerSection
                             uvSection
@@ -82,12 +83,11 @@ struct ContentView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 20)
-                        .padding(.bottom, uvService.isOfflineMode ? 40 : 0)
-                    .animation(.easeInOut(duration: 0.3), value: uvService.isOfflineMode)
+                        .padding(.bottom, 80) // Always add enough bottom padding for tab bar
+                        .animation(.easeInOut(duration: 0.3), value: uvService.isOfflineMode)
                         .frame(maxWidth: .infinity, minHeight: geometry.size.height)
                         .frame(width: geometry.size.width)
                     }
-                    .scrollDisabled(contentFitsInScreen(geometry: geometry))
                 }
             }
             
@@ -805,13 +805,6 @@ struct ContentView: View {
                 return "\(hours)h \(remainingMinutes)m"
             }
         }
-    }
-    
-    private func contentFitsInScreen(geometry: GeometryProxy) -> Bool {
-        // Estimate content height
-        let estimatedHeight: CGFloat = 40 + 250 + 140 + 70 + 70 + 70 + 40 // header + UV + vitD + button + clothing + skin + padding
-        let offlineBarHeight: CGFloat = uvService.isOfflineMode ? 50 : 0
-        return estimatedHeight + offlineBarHeight < geometry.size.height
     }
 
     private func syncPreferencesFromUser() {
