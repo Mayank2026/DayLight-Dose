@@ -15,7 +15,7 @@ struct SessionsView: View {
     @State private var currentGradientColors: [Color] = []
     @State private var showStats = false
     @State private var selectedSession: VitaminDSession? = nil
-    @State private var showAnalyzeSheet = false
+    // Removed: @State private var showAnalyzeSheet = false
     
     var body: some View {
         ZStack {
@@ -129,7 +129,6 @@ struct SessionsView: View {
                     SessionCard(session: session)
                         .onTapGesture {
                             selectedSession = session
-                            showAnalyzeSheet = true
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
@@ -143,12 +142,10 @@ struct SessionsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
         }
-        .sheet(isPresented: $showAnalyzeSheet) {
-            if let session = selectedSession {
-                AnalyzeSessionView(session: session)
-//                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
+        .sheet(item: $selectedSession) { session in
+            AnalyzeSessionView(session: session)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
     }
     

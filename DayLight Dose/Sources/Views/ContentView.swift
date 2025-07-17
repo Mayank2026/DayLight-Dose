@@ -141,6 +141,7 @@ struct ContentView: View {
     @State private var timerCancellable: AnyCancellable?
     @StateObject private var summaryViewModel = TextGenerationViewModel()
     @State private var isGenerating = false
+    @State private var selectedSession: VitaminDSession? = nil
     
     private let timer = Timer.publish(every: 60, on: .main, in: .common)
     
