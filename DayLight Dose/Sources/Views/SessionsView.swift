@@ -330,9 +330,16 @@ struct AnalyzeSessionView: View {
                 // Analysis output or shimmer
                 Group {
                     if isGenerating {
-                        MultilineShimmerView(lineCount: 3, lineHeight: 16, spacing: 12)
-                            .frame(height: 60)
-                            .padding(.top, 4)
+                        VStack(spacing: 12) {
+                            ForEach(0..<3, id: \.self) { index in
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white.opacity(0.13))
+                                    .frame(height: 16)
+                                    .shimmering()
+                            }
+                        }
+                        .frame(height: 60)
+                        .padding(.top, 4)
                     } else if !viewModel.output.isEmpty {
                         VStack(spacing: 8) {
                             HStack(spacing: 6) {

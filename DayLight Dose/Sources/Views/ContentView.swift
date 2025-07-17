@@ -31,9 +31,9 @@ struct MultilineShimmerView: View {
                             : CGFloat.random(in: 220...320),
                         height: lineHeight
                     )
+                    .shimmering() // <-- Move shimmer here!
             }
         }
-        .shimmering()
     }
 }
 
@@ -68,6 +68,8 @@ struct ShimmerEffect: ViewModifier {
                                 .repeatForever(autoreverses: false),
                             value: phase
                         )
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped() // <-- Ensure shimmer overlay is clipped to bounds
                 }
                 .allowsHitTesting(false)
             )
