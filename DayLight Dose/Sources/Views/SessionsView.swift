@@ -14,6 +14,8 @@ struct SessionsView: View {
     
     @State private var currentGradientColors: [Color] = []
     @State private var showStats = false
+    @State private var selectedSession: VitaminDSession? = nil
+    @State private var showAnalyzeSheet = false
     
     var body: some View {
         ZStack {
@@ -125,6 +127,10 @@ struct SessionsView: View {
             LazyVStack(spacing: 16) {
                 ForEach(sessions) { session in
                     SessionCard(session: session)
+                        .onTapGesture {
+                            selectedSession = session
+                            showAnalyzeSheet = true
+                        }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 deleteSession(session)
@@ -136,6 +142,13 @@ struct SessionsView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
+        }
+        .sheet(isPresented: $showAnalyzeSheet) {
+            if let session = selectedSession {
+                AnalyzeSessionView(session: session)
+//                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
     
@@ -207,6 +220,126 @@ struct SessionsView: View {
             return formatter.string(from: NSNumber(value: value)) ?? "\(Int(value))"
         } else {
             return String(format: "%.0fK", value / 1000)
+        }
+    }
+}
+
+@available(iOS 26, *)
+struct AnalyzeSessionView: View {
+    let session: VitaminDSession
+    @StateObject private var viewModel = TextGenerationViewModel()
+    @State private var isGenerating = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Session details card
+            VStack(alignment: .leading, spacing: 6) {
+                Text(session.startTime, style: .date)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                HStack {
+                    Label(session.durationString, systemImage: "timer")
+                    Label("\(Int(session.totalIU)) IU", systemImage: "sun.max.fill")
+                }
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.85))
+                HStack {
+                    Label("Avg UV: \(String(format: "%.1f", session.averageUV))", systemImage: "sun.max")
+                    Label("Peak UV: \(String(format: "%.1f", session.peakUV))", systemImage: "flame.fill")
+                }
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.85))
+                HStack {
+                    Label(session.clothingLevelDescription, systemImage: "tshirt.fill")
+                    Label(session.skinTypeDescription, systemImage: "person.crop.circle")
+                    Label("Age: \(session.userAge)", systemImage: "figure.walk")
+                }
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.85))
+            }
+            .padding()
+            .background(Color.white.opacity(0.08))
+            .cornerRadius(14)
+            .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+
+            // Analysis button and output
+            Button(action: {
+                isGenerating = true
+                viewModel.generateText()
+            }) {
+                HStack(spacing: 8) {
+                    if isGenerating {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    Text(isGenerating ? "Analyzing..." : "Generate Analysis")
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .padding(.vertical, 2)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(BlurView(style: .systemUltraThinMaterialDark))
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.10), radius: 6, x: 0, y: 2)
+                .opacity(isGenerating ? 0.7 : 1)
+            }
+            .disabled(isGenerating)
+            .padding(.top, 2)
+
+            Group {
+                if isGenerating {
+                    MultilineShimmerView(lineCount: 3, lineHeight: 16, spacing: 12)
+                        .frame(height: 60)
+                        .padding(.top, 4)
+                } else if !viewModel.output.isEmpty {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "apple.intelligence")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text("AI-generated analysis")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity)
+                        Text(viewModel.output)
+                            .padding()
+                            .background(Color.white.opacity(0.10))
+                            .cornerRadius(12)
+                            .foregroundColor(.white)
+                            .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                            .transition(.opacity)
+                    }
+                }
+            }
+
+        }
+        .padding()
+        .background(Color.black.opacity(0.25))
+        .cornerRadius(18)
+        .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
+        .onAppear {
+            viewModel.input = """
+            Analyze this vitamin D session for the user in 2-3 sentences, using clear and friendly language:
+            
+            - Date: \(session.startTime.formatted())
+            - Duration: \(session.durationString)
+            - Total Vitamin D: \(Int(session.totalIU)) IU
+            - Average UV: \(String(format: "%.1f", session.averageUV))
+            - Peak UV: \(String(format: "%.1f", session.peakUV))
+            - Clothing: \(session.clothingLevelDescription)
+            - Skin Type: \(session.skinTypeDescription)
+            - Age: \(session.userAge)
+            """
+        }
+        .onChange(of: viewModel.output) { _, newValue in
+            if isGenerating && !newValue.isEmpty {
+                isGenerating = false
+            }
         }
     }
 }

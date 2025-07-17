@@ -59,7 +59,7 @@ class HealthManager: ObservableObject {
             end: date,
             metadata: [
                 HKMetadataKeyWasUserEntered: false,
-                "Source": "Sun Day - UV Exposure",
+                "Source": "Daylight Dose - UV Exposure",
                 "Method": "Calculated from UV exposure",
                 "OriginalValueInIU": amount
             ]

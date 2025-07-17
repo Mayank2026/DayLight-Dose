@@ -5,13 +5,123 @@
 //  Created by Mayank Verma on 15/07/25.
 //
 
-import SwiftUI
 import CoreLocation
 import UIKit
 import SwiftData
 import WidgetKit
 import Combine
+import Foundation
+import FoundationModels
+import SwiftUI
 
+// --- Multiline skeleton shimmer for summary loading ---
+struct MultilineShimmerView: View {
+    let lineCount: Int
+    let lineHeight: CGFloat
+    let spacing: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(0..<lineCount, id: \.self) { index in
+                RoundedRectangle(cornerRadius: lineHeight / 2)
+                    .fill(Color.white.opacity(0.13))
+                    .frame(
+                        width: index == lineCount - 1 && lineCount > 1
+                            ? CGFloat.random(in: 80...160)
+                            : CGFloat.random(in: 220...320),
+                        height: lineHeight
+                    )
+            }
+        }
+        .shimmering()
+    }
+}
+
+extension View {
+    func shimmering() -> some View {
+        self.modifier(ShimmerEffect())
+    }
+}
+
+struct ShimmerEffect: ViewModifier {
+    @State private var phase: CGFloat = 0
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geometry in
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.0),
+                                    Color.white.opacity(0.25),
+                                    Color.white.opacity(0.0)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .rotationEffect(.degrees(15))
+                        .offset(x: phase * geometry.size.width * 2 - geometry.size.width)
+                        .animation(
+                            Animation.linear(duration: 1.2)
+                                .repeatForever(autoreverses: false),
+                            value: phase
+                        )
+                }
+                .allowsHitTesting(false)
+            )
+            .onAppear {
+                phase = 1
+            }
+    }
+}
+
+@available(iOS 26, *)
+@MainActor
+class TextGenerationViewModel: ObservableObject {
+    @Published var input: String = ""
+    @Published var output: String = ""
+    private var session: LanguageModelSession?
+
+    init() {
+        Task {
+            do {
+                session = try await LanguageModelSession()
+            } catch {
+                print("Failed to create LanguageModelSession: \(error)")
+            }
+        }
+    }
+
+    func generateText() {
+        Task {
+            guard let session else { return }
+            do {
+                let result = try await session.respond(to: input)
+                output = result.content
+            } catch {
+                output = "Error: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+// Fallback for earlier iOS versions
+struct ContentViewLegacy: View {
+    var body: some View {
+        VStack {
+            Text("This feature requires iOS 26 or newer.")
+                .font(.title2)
+                .foregroundColor(.secondary)
+                .padding()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+    }
+}
+
+@available(iOS 26, *)
 struct ContentView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var uvService: UVService
@@ -29,6 +139,8 @@ struct ContentView: View {
     @State private var showInfoSheet = false
     @State private var lastUVUpdate: Date = UserDefaults.standard.object(forKey: "lastUVUpdate") as? Date ?? Date()
     @State private var timerCancellable: AnyCancellable?
+    @StateObject private var summaryViewModel = TextGenerationViewModel()
+    @State private var isGenerating = false
     
     private let timer = Timer.publish(every: 60, on: .main, in: .common)
     
@@ -37,42 +149,41 @@ struct ContentView: View {
             backgroundGradient
             
             GeometryReader { geometry in
-                ScrollView {
-                    if uvService.hasNoData {
-                        // No data available view
-                        VStack(spacing: 20) {
-                            Image(systemName: "wifi.slash")
-                                .font(.system(size: 60))
-                                .foregroundColor(.white.opacity(0.6))
-                            
-                            Text("No Data Available")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            Text("Connect to the internet to fetch UV data")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.8))
-                                .multilineTextAlignment(.center)
-                            
-                            if locationManager.location != nil {
-                                Button(action: {
-                                    if let location = locationManager.location {
-                                        uvService.fetchUVData(for: location)
-                                    }
-                                }) {
-                                    Text("Retry")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 30)
-                                        .padding(.vertical, 12)
-                                        .background(Color.white.opacity(0.2))
-                                        .cornerRadius(25)
+                if uvService.hasNoData {
+                    // No data available view
+                    VStack(spacing: 20) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        Text("No Data Available")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        Text("Connect to the internet to fetch UV data")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                        
+                        if locationManager.location != nil {
+                            Button(action: {
+                                if let location = locationManager.location {
+                                    uvService.fetchUVData(for: location)
                                 }
+                            }) {
+                                Text("Retry")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 30)
+                                    .padding(.vertical, 12)
+                                    .background(Color.white.opacity(0.2))
+                                    .cornerRadius(25)
                             }
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.bottom, 80) // Add bottom padding for tab bar
-                    } else {
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
                         VStack(spacing: 20) {
                             headerSection
                             uvSection
@@ -80,14 +191,122 @@ struct ContentView: View {
                             exposureToggle
                             clothingSection
                             skinTypeSection
+                            // --- Summary Section ---
+                            if #available(iOS 26, *) {
+                                VStack(alignment: .leading, spacing: 18) {
+                                    Text("Summary")
+                                        .font(.title3.bold())
+                                        .foregroundColor(.white)
+                                        .padding(.bottom, 2)
+                                    // HIDE PROMPT: Do not show TextEditor
+                                    Button(action: {
+                                        isGenerating = true
+                                        summaryViewModel.generateText()
+                                    }) {
+                                        HStack(spacing: 8) {
+                                            if isGenerating {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            }
+                                            Text(isGenerating ? "Generating..." : "Generate Summary")
+                                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                                .padding(.vertical, 2)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 16)
+                                        .background(
+                                            BlurView(style: .systemUltraThinMaterialDark)
+                                        )
+                                        .cornerRadius(14)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.10), radius: 6, x: 0, y: 2)
+                                        .opacity(isGenerating ? 0.7 : 1)
+                                    }
+                                    .disabled(isGenerating)
+                                    .padding(.top, 2)
+                                    Group {
+                                        if isGenerating {
+                                            MultilineShimmerView(lineCount: 3, lineHeight: 16, spacing: 12)
+                                                .frame(height: 60)
+                                                .padding(.top, 4)
+                                        } else if !summaryViewModel.output.isEmpty {
+                                            VStack(spacing: 8) {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "apple.intelligence")
+                                                        .font(.system(size: 22, weight: .semibold))
+                                                        .foregroundColor(.white)
+                                                    Text("AI-generated summary")
+                                                        .font(.caption)
+                                                        .foregroundColor(.white.opacity(0.7))
+                                                }
+                                                .frame(maxWidth: .infinity)
+                                                Text(summaryViewModel.output)
+                                                    .padding()
+                                                    .background(Color.white.opacity(0.10))
+                                                    .cornerRadius(12)
+                                                    .foregroundColor(.white)
+                                                    .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                                                    .transition(.opacity)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding()
+                                .background(Color.black.opacity(0.25))
+                                .cornerRadius(18)
+                                .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
+                                .onAppear {
+                                    summaryViewModel.input = """
+Summarize the following health and sunlight exposure stats for a user in 2-3 sentences, using clear and friendly language:
+
+- UV Index: \(String(format: "%.1f", uvService.currentUV))
+- Burn Limit: \(uvService.currentUV == 0 ? "---" : formatSafeTime(safeExposureTime))
+- Max UVI: \(String(format: "%.1f", uvService.displayMaxUV))
+- Sunrise: \(formatTime(uvService.displaySunrise))
+- Sunset: \(formatTime(uvService.displaySunset))
+- Cloud Cover: \(Int(uvService.currentCloudCover))%
+- Altitude: \(Int(uvService.currentAltitude))m
+- Location: \(locationManager.locationName)
+- Vitamin D Rate: \(formatVitaminDNumber(vitaminDCalculator.currentVitaminDRate / 60.0)) IU/min
+- Session Vitamin D: \(formatVitaminDNumber(vitaminDCalculator.sessionVitaminD)) IU
+- Today's Total Vitamin D: \(formatTodaysTotal(todaysTotal + vitaminDCalculator.sessionVitaminD)) IU
+- Clothing: \(vitaminDCalculator.clothingLevel.description)
+- Skin Type: \(vitaminDCalculator.skinType.description)
+- Age: \(vitaminDCalculator.userAge)
+"""
+                                }
+                                .onChange(of: summaryViewModel.output) { _, newValue in
+                                    if isGenerating && !newValue.isEmpty {
+                                        isGenerating = false
+                                    }
+                                }
+                            } else {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Summary")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Text("Summarization is only available on iOS 26 and newer.")
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .padding()
+                                        .background(Color.white.opacity(0.08))
+                                        .cornerRadius(8)
+                                }
+                                .padding()
+                                .background(Color.black.opacity(0.2))
+                                .cornerRadius(16)
+                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 20)
-                        .padding(.bottom, 80) // Always add enough bottom padding for tab bar
+                        .padding(.bottom, uvService.isOfflineMode ? 40 : 0)
                         .animation(.easeInOut(duration: 0.3), value: uvService.isOfflineMode)
                         .frame(maxWidth: .infinity, minHeight: geometry.size.height)
                         .frame(width: geometry.size.width)
                     }
+                    .scrollDisabled(contentFitsInScreen(geometry: geometry))
                 }
             }
             
@@ -806,6 +1025,13 @@ struct ContentView: View {
             }
         }
     }
+    
+    private func contentFitsInScreen(geometry: GeometryProxy) -> Bool {
+        // Estimate content height
+        let estimatedHeight: CGFloat = 40 + 250 + 140 + 70 + 70 + 70 + 40 + 100 + 40 // header + UV + vitD + button + clothing + skin + padding + summary + padding
+        let offlineBarHeight: CGFloat = uvService.isOfflineMode ? 50 : 0
+        return estimatedHeight + offlineBarHeight < geometry.size.height
+    }
 
     private func syncPreferencesFromUser() {
         guard let prefs = userPreferences.first else { return }
@@ -983,7 +1209,7 @@ struct InfoSheet: View {
                         Text("About")
                             .font(.headline)
                         
-                        Text("Sun Day uses a scientifically-based multi-factor model to estimate vitamin D synthesis from UV exposure.")
+                        Text("Daylight Dose uses a scientifically-based multi-factor model to estimate vitamin D synthesis from UV exposure.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -1131,5 +1357,14 @@ struct FactorRow: View {
                 .fontWeight(.medium)
         }
     }
+}
+
+import UIKit
+struct BlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
 

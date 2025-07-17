@@ -351,7 +351,7 @@ class UVService: ObservableObject {
                 self.scheduleNotification(
                     at: self.todaySunset,
                     title: "🌅 The sun is setting.",
-                    body: "Check your vitamin D progress in Sun Day.",
+                    body: "Check your vitamin D progress in Daylight Dose.",
                     identifier: "sunset"
                 )
                 
