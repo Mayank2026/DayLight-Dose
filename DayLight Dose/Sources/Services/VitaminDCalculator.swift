@@ -11,6 +11,7 @@ import HealthKit
 import UserNotifications
 import WidgetKit
 import UIKit
+import SwiftData
 
 enum ClothingLevel: Int, CaseIterable {
     case none = -1
@@ -112,6 +113,7 @@ class VitaminDCalculator: ObservableObject {
     private var appActiveObserver: NSObjectProtocol?
     private var appBackgroundObserver: NSObjectProtocol?
     private var wasTrackingBeforeBackground = false
+    private var modelContext: ModelContext?
     
     // UV response curve parameters
     private let uvHalfMax = 4.0  // UV index for 50% vitamin D synthesis rate (more linear)
@@ -129,6 +131,10 @@ class VitaminDCalculator: ObservableObject {
         if let observer = appBackgroundObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+    }
+    
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
     }
     
     func setHealthManager(_ healthManager: HealthManager) {
@@ -222,6 +228,34 @@ class VitaminDCalculator: ObservableObject {
     }
     
     func stopSession() {
+        guard let startTime = sessionStartTime else { return }
+        
+        let endTime = Date()
+        let sessionDuration = endTime.timeIntervalSince(startTime)
+        
+        // Save session to SwiftData if we have meaningful data
+        if sessionVitaminD > 0 && sessionDuration > 0 {
+            if let context = modelContext {
+                let session = VitaminDSession(
+                    startTime: startTime,
+                    endTime: endTime,
+                    totalIU: sessionVitaminD,
+                    averageUV: lastUV,
+                    peakUV: lastUV, // We could track peak UV during session if needed
+                    clothingLevel: clothingLevel.rawValue,
+                    skinType: skinType.rawValue,
+                    userAge: userAge
+                )
+                
+                do {
+                    context.insert(session)
+                    try context.save()
+                } catch {
+                    print("Failed to save session: \(error)")
+                }
+            }
+        }
+        
         timer?.invalidate()
         timer = nil
         sessionStartTime = nil

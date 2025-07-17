@@ -34,14 +34,55 @@ final class VitaminDSession {
     var peakUV: Double
     var clothingLevel: Int
     var skinType: Int
+    var userAge: Int
+    var duration: Double // Duration in seconds
     
-    init(startTime: Date, totalIU: Double = 0, averageUV: Double = 0, peakUV: Double = 0, clothingLevel: Int, skinType: Int) {
+    init(startTime: Date, endTime: Date? = nil, totalIU: Double = 0, averageUV: Double = 0, peakUV: Double = 0, clothingLevel: Int, skinType: Int, userAge: Int = 30) {
         self.startTime = startTime
+        self.endTime = endTime
         self.totalIU = totalIU
         self.averageUV = averageUV
         self.peakUV = peakUV
         self.clothingLevel = clothingLevel
         self.skinType = skinType
+        self.userAge = userAge
+        self.duration = endTime?.timeIntervalSince(startTime) ?? 0
+    }
+    
+    var durationString: String {
+        let minutes = Int(duration / 60)
+        let seconds = Int(duration.truncatingRemainder(dividingBy: 60))
+        
+        if minutes == 0 {
+            return "\(seconds)s"
+        } else if seconds == 0 {
+            return "\(minutes)m"
+        } else {
+            return "\(minutes)m \(seconds)s"
+        }
+    }
+    
+    var clothingLevelDescription: String {
+        switch clothingLevel {
+        case -1: return "Nude"
+        case 0: return "Minimal"
+        case 1: return "Light"
+        case 2: return "Moderate"
+        case 3: return "Heavy"
+        default: return "Unknown"
+        }
+    }
+    
+    var skinTypeDescription: String {
+        switch skinType {
+        case 1: return "Very Fair"
+        case 2: return "Fair"
+        case 3: return "Light"
+        case 4: return "Medium"
+        case 5: return "Dark"
+        case 6: return "Very Dark"
+        default: return "Unknown"
+        }
     }
 }
 
