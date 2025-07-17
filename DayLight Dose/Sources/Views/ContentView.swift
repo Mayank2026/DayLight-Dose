@@ -209,23 +209,14 @@ struct ContentView: View {
                                                 ProgressView()
                                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                             }
-                                            Text(isGenerating ? "Generating..." : "Generate Summary")
+                                            Text(isGenerating ? "Analyzing..." : "Generate Analysis")
                                                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                                                 .padding(.vertical, 2)
                                         }
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 16)
-                                        .background(
-                                            BlurView(style: .systemUltraThinMaterialDark)
-                                        )
-                                        .cornerRadius(14)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                                        )
-                                        .shadow(color: Color.black.opacity(0.10), radius: 6, x: 0, y: 2)
-                                        .opacity(isGenerating ? 0.7 : 1)
                                     }
+                                    .buttonStyle(.glass)
                                     .disabled(isGenerating)
                                     .padding(.top, 2)
                                     Group {
