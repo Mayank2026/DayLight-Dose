@@ -341,7 +341,9 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
                 if newColors != currentGradientColors {
                     currentGradientColors = newColors
                 }
+                updateWidgetSharedData()
             }
+            updateWidgetSharedData()
         }
         .onChange(of: userPreferences.first) { _ in
             syncPreferencesFromUser()
@@ -379,23 +381,31 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
         }
         .onChange(of: vitaminDCalculator.isInSun) {
             handleSunToggle()
+            updateWidgetSharedData()
         }
         .onChange(of: locationManager.location) { _, newLocation in
             if let location = newLocation {
                 uvService.fetchUVData(for: location)
+                updateWidgetSharedData()
             }
         }
         .onChange(of: vitaminDCalculator.clothingLevel) {
             // Update rate when clothing changes
             vitaminDCalculator.updateUV(uvService.currentUV)
+            updateWidgetSharedData()
         }
         .onChange(of: vitaminDCalculator.skinType) {
             // Update rate when skin type changes
             vitaminDCalculator.updateUV(uvService.currentUV)
+            updateWidgetSharedData()
         }
         .onChange(of: uvService.currentUV) { _, newUV in
             // Update rate when UV changes
             vitaminDCalculator.updateUV(newUV)
+            updateWidgetSharedData()
+        }
+        .onChange(of: todaysTotal) { _, _ in
+            updateWidgetSharedData()
         }
         .onOpenURL { url in
             handleURL(url)
@@ -875,6 +885,7 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
             // Then reload from HealthKit to ensure accuracy
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 loadTodaysTotal()
+                updateWidgetSharedData()
             }
         }
     }
@@ -882,6 +893,7 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
     private func loadTodaysTotal() {
         healthManager.getTodaysVitaminD { total in
             todaysTotal = total ?? 0
+            updateWidgetSharedData()
         }
     }
     
@@ -1036,6 +1048,16 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
             vitaminDCalculator.clothingLevel = clothingLevel
         }
         vitaminDCalculator.userAge = prefs.userAge
+    }
+    
+    // Helper to update widget shared data
+    private func updateWidgetSharedData() {
+        let sharedDefaults = UserDefaults(suiteName: "group.sunday.widget")
+        sharedDefaults?.set(uvService.currentUV, forKey: "currentUV")
+        sharedDefaults?.set(todaysTotal + vitaminDCalculator.sessionVitaminD, forKey: "todaysTotal")
+        sharedDefaults?.set(vitaminDCalculator.currentVitaminDRate, forKey: "vitaminDRate")
+        sharedDefaults?.set(vitaminDCalculator.isInSun, forKey: "isTracking")
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 
