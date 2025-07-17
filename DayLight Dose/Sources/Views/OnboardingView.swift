@@ -143,19 +143,19 @@ struct OnboardingView: View {
                                     currentPage += 1
                                 }
                             }
-                            .foregroundColor(.black)
+                            .foregroundColor(.white)
                             .padding(.horizontal, 30)
                             .padding(.vertical, 12)
-                            .background(Color.white)
+                            .background(Color.black.opacity(0.2))
                             .cornerRadius(25)
                         } else {
                             Button("Get Started") {
                                 completeOnboarding()
                             }
-                            .foregroundColor(.black)
+                            .foregroundColor(.white)
                             .padding(.horizontal, 30)
                             .padding(.vertical, 12)
-                            .background(Color.white)
+                            .background(Color.black.opacity(0.2))
                             .cornerRadius(25)
                         }
                     }
@@ -245,7 +245,7 @@ struct OnboardingPageView: View {
                     .frame(width: 120, height: 120)
                 Image(systemName: page.imageName)
                     .font(.system(size: 50))
-                    .foregroundColor(.orange)
+                    .foregroundColor(.white)
             }
             VStack(spacing: 16) {
                 Text(page.title)
@@ -256,7 +256,7 @@ struct OnboardingPageView: View {
                 Text(page.subtitle)
                     .font(.title2)
                     .fontWeight(.medium)
-                    .foregroundColor(.black)
+                    .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                 Text(page.description)
                     .font(.body)

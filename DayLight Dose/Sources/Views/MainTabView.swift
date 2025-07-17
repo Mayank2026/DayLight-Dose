@@ -45,12 +45,12 @@ struct MainTabView: View {
             // Customize tab bar appearance
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+            appearance.backgroundColor = UIColor.white.withAlphaComponent(0.3)
             
             // Customize tab bar item appearance
-            appearance.stackedLayoutAppearance.normal.iconColor = UIColor.white.withAlphaComponent(0.6)
+            appearance.stackedLayoutAppearance.normal.iconColor = UIColor.black.withAlphaComponent(0.6)
             appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
-                .foregroundColor: UIColor.white.withAlphaComponent(0.6)
+                .foregroundColor: UIColor.black.withAlphaComponent(0.6)
             ]
             
             appearance.stackedLayoutAppearance.selected.iconColor = UIColor.black

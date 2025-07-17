@@ -20,6 +20,7 @@ struct ContentView: View {
     @EnvironmentObject var networkMonitor: NetworkMonitor
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Query private var userPreferences: [UserPreferences]
     
     @State private var showClothingPicker = false
     @State private var showSkinTypePicker = false
@@ -117,6 +118,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: uvService.isOfflineMode)
         .onAppear {
             setupApp()
+            syncPreferencesFromUser()
             // Start timer when view appears
             timerCancellable = timer.autoconnect().sink { _ in
                 updateData()
@@ -127,6 +129,9 @@ struct ContentView: View {
                     currentGradientColors = newColors
                 }
             }
+        }
+        .onChange(of: userPreferences.first) { _ in
+            syncPreferencesFromUser()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Check for updated skin type and adaptation when app returns to foreground
@@ -807,6 +812,17 @@ struct ContentView: View {
         let estimatedHeight: CGFloat = 40 + 250 + 140 + 70 + 70 + 70 + 40 // header + UV + vitD + button + clothing + skin + padding
         let offlineBarHeight: CGFloat = uvService.isOfflineMode ? 50 : 0
         return estimatedHeight + offlineBarHeight < geometry.size.height
+    }
+
+    private func syncPreferencesFromUser() {
+        guard let prefs = userPreferences.first else { return }
+        if let skinType = SkinType(rawValue: prefs.skinType) {
+            vitaminDCalculator.skinType = skinType
+        }
+        if let clothingLevel = ClothingLevel(rawValue: prefs.clothingLevel) {
+            vitaminDCalculator.clothingLevel = clothingLevel
+        }
+        vitaminDCalculator.userAge = prefs.userAge
     }
 }
 
