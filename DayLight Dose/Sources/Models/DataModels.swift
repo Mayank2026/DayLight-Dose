@@ -13,6 +13,7 @@ final class UserPreferences {
     var clothingLevel: Int = 1 // Default to light clothing
     var skinType: Int = 3 // Default to type 3
     var userAge: Int = 30
+    var hasCompletedOnboarding: Bool = false // Tracks if onboarding is complete
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     
@@ -22,6 +23,29 @@ final class UserPreferences {
         self.userAge = userAge
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+    
+    var skinTypeDescription: String {
+        switch skinType {
+        case 1: return "Very Fair"
+        case 2: return "Fair"
+        case 3: return "Light"
+        case 4: return "Medium"
+        case 5: return "Dark"
+        case 6: return "Very Dark"
+        default: return "Unknown"
+        }
+    }
+    
+    var clothingLevelDescription: String {
+        switch clothingLevel {
+        case -1: return "Nude"
+        case 0: return "Minimal"
+        case 1: return "Light"
+        case 2: return "Moderate"
+        case 3: return "Heavy"
+        default: return "Unknown"
+        }
     }
 }
 
@@ -131,3 +155,4 @@ final class CachedUVData {
         self.lastUpdated = Date()
     }
 }
+

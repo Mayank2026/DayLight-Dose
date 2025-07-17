@@ -32,6 +32,13 @@ struct MainTabView: View {
                     Text("Learn")
                 }
                 .tag(2)
+            
+            SettingsView()
+                .tabItem {
+                    Image(systemName: "gear")
+                    Text("Settings")
+                }
+                .tag(3)
         }
         .accentColor(.white)
         .onAppear {

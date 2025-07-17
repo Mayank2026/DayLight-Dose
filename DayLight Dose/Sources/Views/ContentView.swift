@@ -986,7 +986,7 @@ struct InfoSheet: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        Link("View detailed methodology", destination: URL(string: "https://github.com/jackjackbits/sunday/blob/main/METHODOLOGY.md")!)
+                        Link("View detailed methodology", destination: URL(string: "https://github.com/Mayank2026/DayLight-Dose/blob/main/METHODOLOGY.md")!)
                             .font(.caption)
                             .foregroundColor(.blue)
                     }

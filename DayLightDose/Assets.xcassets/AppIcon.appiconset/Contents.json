@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "Daylight_Dose-iOS-Default-1024x1024@2x.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -12,6 +13,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "Daylight_Dose-iOS-Dark-1024x1024@2x.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -23,6 +25,7 @@
           "value" : "tinted"
         }
       ],
+      "filename" : "Daylight_Dose-iOS-ClearLight-1024x1024@2x.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

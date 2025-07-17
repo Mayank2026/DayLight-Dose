@@ -114,46 +114,11 @@ struct SessionsView: View {
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            
-            // Add sample data button for testing
-            Button(action: addSampleSessions) {
-                Text("Add Sample Sessions")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(25)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    private func addSampleSessions() {
-        let calendar = Calendar.current
-        let now = Date()
-        
-        // Create sample sessions for the past few days
-        for i in 0..<5 {
-            let startTime = calendar.date(byAdding: .day, value: -i, to: now) ?? now
-            let endTime = calendar.date(byAdding: .minute, value: Int.random(in: 15...45), to: startTime) ?? startTime
-            
-            let session = VitaminDSession(
-                startTime: startTime,
-                endTime: endTime,
-                totalIU: Double.random(in: 500...2500),
-                averageUV: Double.random(in: 3...8),
-                peakUV: Double.random(in: 4...10),
-                clothingLevel: Int.random(in: 0...2),
-                skinType: Int.random(in: 1...4),
-                userAge: 30
-            )
-            
-            modelContext.insert(session)
-        }
-        
-        try? modelContext.save()
-    }
+
     
     private var sessionsList: some View {
         ScrollView {

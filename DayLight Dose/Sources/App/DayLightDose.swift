@@ -47,7 +47,7 @@ struct DayLightDose: App {
     
     var body: some Scene {
         WindowGroup {
-            MainTabView()
+            RootView()
                 .environmentObject(locationManager)
                 .environmentObject(healthManager)
                 .environmentObject(uvService)
