@@ -204,6 +204,24 @@ struct ContentView: View {
                                     // HIDE PROMPT: Do not show TextEditor
                                     Button(action: {
                                         isGenerating = true
+                                        summaryViewModel.input = """
+Summarize the following health and sunlight exposure stats for a user in 2-3 sentences, using clear and friendly language:
+
+- UV Index: \(String(format: "%.1f", uvService.currentUV))
+- Burn Limit: \(uvService.currentUV == 0 ? "---" : formatSafeTime(safeExposureTime))
+- Max UVI: \(String(format: "%.1f", uvService.displayMaxUV))
+- Sunrise: \(formatTime(uvService.displaySunrise))
+- Sunset: \(formatTime(uvService.displaySunset))
+- Cloud Cover: \(Int(uvService.currentCloudCover))%
+- Altitude: \(Int(uvService.currentAltitude))m
+- Location: \(locationManager.locationName)
+- Vitamin D Rate: \(formatVitaminDNumber(vitaminDCalculator.currentVitaminDRate / 60.0)) IU/min
+- Session Vitamin D: \(formatVitaminDNumber(vitaminDCalculator.sessionVitaminD)) IU
+- Today's Total Vitamin D: \(formatTodaysTotal(todaysTotal + vitaminDCalculator.sessionVitaminD)) IU
+- Clothing: \(vitaminDCalculator.clothingLevel.description)
+- Skin Type: \(vitaminDCalculator.skinType.description)
+- Age: \(vitaminDCalculator.userAge)
+"""
                                         summaryViewModel.generateText()
                                     }) {
                                         HStack(spacing: 8) {
@@ -252,26 +270,6 @@ struct ContentView: View {
                                 .background(Color.black.opacity(0.25))
                                 .cornerRadius(18)
                                 .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
-                                .onAppear {
-                                    summaryViewModel.input = """
-Summarize the following health and sunlight exposure stats for a user in 2-3 sentences, using clear and friendly language:
-
-- UV Index: \(String(format: "%.1f", uvService.currentUV))
-- Burn Limit: \(uvService.currentUV == 0 ? "---" : formatSafeTime(safeExposureTime))
-- Max UVI: \(String(format: "%.1f", uvService.displayMaxUV))
-- Sunrise: \(formatTime(uvService.displaySunrise))
-- Sunset: \(formatTime(uvService.displaySunset))
-- Cloud Cover: \(Int(uvService.currentCloudCover))%
-- Altitude: \(Int(uvService.currentAltitude))m
-- Location: \(locationManager.locationName)
-- Vitamin D Rate: \(formatVitaminDNumber(vitaminDCalculator.currentVitaminDRate / 60.0)) IU/min
-- Session Vitamin D: \(formatVitaminDNumber(vitaminDCalculator.sessionVitaminD)) IU
-- Today's Total Vitamin D: \(formatTodaysTotal(todaysTotal + vitaminDCalculator.sessionVitaminD)) IU
-- Clothing: \(vitaminDCalculator.clothingLevel.description)
-- Skin Type: \(vitaminDCalculator.skinType.description)
-- Age: \(vitaminDCalculator.userAge)
-"""
-                                }
                                 .onChange(of: summaryViewModel.output) { _, newValue in
                                     if isGenerating && !newValue.isEmpty {
                                         isGenerating = false
