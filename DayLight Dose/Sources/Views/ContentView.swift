@@ -205,7 +205,15 @@ struct ContentView: View {
                                     Button(action: {
                                         isGenerating = true
                                         summaryViewModel.input = """
-Summarize the following health and sunlight exposure stats for a user in 2-3 sentences, using clear and friendly language:
+Always generate your response in the following format:
+
+**Sunshine and Vitamin D Overview:** [Write a 2-3 sentence summary of the user's current sunlight and vitamin D stats, referencing their UV index, vitamin D rate, clothing, skin type, and total vitamin D.]
+
+Tips for Today:
+1. **[Short, bolded title for the tip]:** [1-2 sentences of actionable advice, referencing the user's actual stats.]
+2. **[Short, bolded title for the tip]:** [1-2 sentences of actionable advice, referencing the user's actual stats.]
+
+Do NOT include tips about morning sun exposure, as the user may use this at any time of day. Focus your tips on safe sun exposure and vitamin D optimization for the rest of the day, regardless of the current time. Do not repeat the same content each time—make the advice specific to the current stats.
 
 - UV Index: \(String(format: "%.1f", uvService.currentUV))
 - Burn Limit: \(uvService.currentUV == 0 ? "---" : formatSafeTime(safeExposureTime))
@@ -255,7 +263,7 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
                                                         .foregroundColor(.white.opacity(0.7))
                                                 }
                                                 .frame(maxWidth: .infinity)
-                                                Text(summaryViewModel.output)
+                                                Text(.init(summaryViewModel.output))
                                                     .padding()
                                                     .background(Color.white.opacity(0.10))
                                                     .cornerRadius(12)

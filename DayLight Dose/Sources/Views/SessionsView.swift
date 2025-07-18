@@ -371,9 +371,9 @@ struct AnalyzeSessionView: View {
         .background(Color.black.opacity(0.18).ignoresSafeArea())
         .onAppear {
             viewModel.input = """
-Analyze this vitamin D session for the user in 2-3 sentences, using clear and friendly language:
+Summarize this vitamin D session for the user in 2-3 sentences, using clear and friendly language. Use the date in the format '18 July 2025' (day month year, no time). Focus on summarizing the vitamin D absorption and providing other useful insights about the session, such as how effective the session was, how the user's stats (UV, clothing, skin type, age, etc.) contributed to the result, and any notable patterns. Do NOT generate tips or advice—just provide a summary and insights.
 
-- Date: \(session.startTime.formatted())
+- Date: \(formatDayMonthYear(session.startTime))
 - Duration: \(session.durationString)
 - Total Vitamin D: \(Int(session.totalIU)) IU
 - Average UV: \(String(format: "%.1f", session.averageUV))
@@ -486,6 +486,12 @@ fileprivate func formatVitaminD(_ value: Double) -> String {
     } else {
         return String(format: "%.0fK", value / 1000)
     }
+}
+
+fileprivate func formatDayMonthYear(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "d MMMM yyyy"
+    return formatter.string(from: date)
 }
 
 struct DetailItem: View {
