@@ -109,7 +109,7 @@ class VitaminDCalculator: ObservableObject {
     private weak var uvService: UVService?
     private var healthKitSkinType: SkinType?
     private var lastUpdateTime: Date?
-    private let sharedDefaults = UserDefaults(suiteName: "group.sunday.widget")
+    private let sharedDefaults = UserDefaults(suiteName: "group.daylight.mayank")
     private var appActiveObserver: NSObjectProtocol?
     private var appBackgroundObserver: NSObjectProtocol?
     private var wasTrackingBeforeBackground = false

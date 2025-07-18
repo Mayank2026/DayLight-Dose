@@ -850,7 +850,7 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
         if uvService.currentMoonPhaseName.isEmpty {
             let defaultPhase = "Waxing Gibbous"
             uvService.currentMoonPhaseName = defaultPhase
-            UserDefaults(suiteName: "group.sunday.widget")?.set(defaultPhase, forKey: "moonPhaseName")
+            UserDefaults(suiteName: "group.daylight.mayank")?.set(defaultPhase, forKey: "moonPhaseName")
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
@@ -1052,7 +1052,7 @@ Summarize the following health and sunlight exposure stats for a user in 2-3 sen
     
     // Helper to update widget shared data
     private func updateWidgetSharedData() {
-        let sharedDefaults = UserDefaults(suiteName: "group.sunday.widget")
+        let sharedDefaults = UserDefaults(suiteName: "group.daylight.mayank")
         sharedDefaults?.set(uvService.currentUV, forKey: "currentUV")
         sharedDefaults?.set(todaysTotal + vitaminDCalculator.sessionVitaminD, forKey: "todaysTotal")
         sharedDefaults?.set(vitaminDCalculator.currentVitaminDRate, forKey: "vitaminDRate")
