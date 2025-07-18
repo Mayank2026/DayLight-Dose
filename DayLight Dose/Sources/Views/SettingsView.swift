@@ -38,7 +38,7 @@ struct SettingsView: View {
                                 Text(prefs.skinTypeDescription)
                                     .foregroundColor(.white.opacity(0.8))
                             }
-                            .listRowBackground(Color.white.opacity(0.1))
+                            .listRowBackground(Color.black.opacity(0.2))
                             HStack {
                                 Text("Clothing Level")
                                     .foregroundColor(.white)
@@ -46,7 +46,7 @@ struct SettingsView: View {
                                 Text(prefs.clothingLevelDescription)
                                     .foregroundColor(.white.opacity(0.8))
                             }
-                            .listRowBackground(Color.white.opacity(0.1))
+                            .listRowBackground(Color.black.opacity(0.2))
                             HStack {
                                 Text("Age")
                                     .foregroundColor(.white)
@@ -56,7 +56,7 @@ struct SettingsView: View {
                                 }
                                 .foregroundColor(.white)
                             }
-                            .listRowBackground(Color.white.opacity(0.1))
+                            .listRowBackground(Color.black.opacity(0.2))
                         }
                     }
                     Section("App Settings") {
@@ -64,7 +64,7 @@ struct SettingsView: View {
                             showingOnboarding = true
                         }
                         .foregroundColor(.white)
-                        .listRowBackground(Color.white.opacity(0.1))
+                        .listRowBackground(Color.black.opacity(0.2))
                     }
                     Section("About") {
                         HStack {
@@ -74,7 +74,7 @@ struct SettingsView: View {
                             Text("1.0.0")
                                 .foregroundColor(.white.opacity(0.8))
                         }
-                        .listRowBackground(Color.white.opacity(0.1))
+                        .listRowBackground(Color.black.opacity(0.2))
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -94,6 +94,8 @@ struct SettingsView: View {
                             try? modelContext.save()
                         }
                     ))
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
                 }
             }
             .onAppear {

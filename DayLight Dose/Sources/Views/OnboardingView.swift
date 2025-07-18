@@ -351,15 +351,7 @@ struct AgePickerView: View {
                     }
                 }
                 .pickerStyle(WheelPickerStyle())
-                Button("Done") {
-                    dismiss()
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 30)
-                .padding(.vertical, 12)
-                .background(Color.orange)
-                .cornerRadius(25)
-                .padding()
+                // Removed the orange Done button here
             }
             .navigationTitle("Select Age")
             .navigationBarTitleDisplayMode(.inline)
