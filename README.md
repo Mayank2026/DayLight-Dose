@@ -2,15 +2,13 @@
 
 # DayLight Dose
 
-![App Logo](DayLight%20Dose/Assets.xcassets/AppIcon.appiconset/Daylight_Dose-iOS-Default-1024x1024@2x.png)
+<img src="DayLight%20Dose/Assets.xcassets/AppIcon.appiconset/Daylight_Dose-iOS-Default-1024x1024@2x.png" alt="App Logo" width="200" height="200">
 
 **Your intelligent companion for safe sun exposure and optimal vitamin D synthesis.**
 
 </div>
 
-**Your intelligent companion for safe sun exposure and optimal vitamin D synthesis.**
-
-DayLight Dose is a scientifically-backed iOS app designed for people suffering from vitamin deficiency, particularly vitamin D deficiency. The app helps you track UV exposure and calculate personalized vitamin D intake in real-time using foundation models based on cutting-edge research in photobiology, dermatology, and nutrition science. These foundation models incorporate multiple environmental and personal factors to provide accurate estimates of vitamin D synthesis while prioritizing your safety with burn time warnings and seasonal alerts.
+DayLight Dose is an AI-powered iOS app designed for people suffering from vitamin deficiency, particularly vitamin D deficiency. The app helps you track UV exposure and calculate personalized vitamin D intake in real-time using a foundation models framework based on cutting-edge research in photobiology, dermatology, and nutrition science. This AI-powered foundation models framework ensures your privacy is secured while incorporating multiple environmental and personal factors to provide accurate estimates of vitamin D synthesis, prioritizing your safety with burn time warnings and seasonal alerts.
 
 [📖 Read the detailed methodology](METHODOLOGY.md)
 
@@ -65,7 +63,9 @@ https://drive.google.com/file/d/1XwW2SqBMng0wWIQEU_qAnxGiMsZQze2m/view?usp=share
 
 ## Foundation Models
 
-DayLight Dose is built on scientifically rigorous foundation models that integrate:
+DayLight Dose is powered by an AI-driven foundation models framework that integrates scientifically rigorous models while securing your privacy. All processing happens locally on your device, ensuring your personal health data never leaves your iPhone.
+
+The foundation models framework integrates:
 
 - **Photobiology models**: UV absorption and vitamin D synthesis pathways based on current research
 - **Dermatological algorithms**: Skin type classification and melanin impact on vitamin D production
@@ -73,7 +73,7 @@ DayLight Dose is built on scientifically rigorous foundation models that integra
 - **Physiological parameters**: Age-related synthesis efficiency, clothing coverage, and body surface area
 - **Safety thresholds**: Burn time calculations and minimum erythema dose (MED) considerations
 
-These foundation models ensure accurate, personalized recommendations specifically tailored for individuals managing vitamin D deficiency.
+This privacy-securing foundation models framework ensures accurate, personalized recommendations specifically tailored for individuals managing vitamin D deficiency, with all AI computations performed securely on-device.
 
 ## Target Audience
 
