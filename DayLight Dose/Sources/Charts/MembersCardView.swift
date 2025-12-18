@@ -6,20 +6,101 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct MembersCardView: View {
-    @State private var selectedTab = "Enrolled"
-    @State private var selectedMonth: MemberStats? = nil
-    let tabs = ["All", "Active", "Enrolled"]
+    @Query(sort: \VitaminDSession.startTime, order: .forward) private var sessions: [VitaminDSession]
     
-    // Get current data based on selected tab
-    var currentData: [MemberStats] {
-        SampleData.data(for: selectedTab)
+    @State private var selectedTab = "Vitamin D"
+    @State private var selectedMonth: MemberStats? = nil
+    let tabs = ["Vitamin D", "Sessions", "UV"]
+    
+    // Formatter for day labels (e.g. "Mon")
+    private var dayFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter
     }
     
-    // Get total members count based on selected tab
-    var totalMembers: String {
-        SampleData.totalMembers(for: selectedTab)
+    // Last 7 calendar days, oldest first, based on session data or today's date.
+    private var dayAnchors: [Date] {
+        let calendar = Calendar.current
+        
+        // If we have sessions, anchor around the latest one; otherwise use today.
+        let referenceDate = sessions.last?.startTime ?? Date()
+        let startOfReferenceDay = calendar.startOfDay(for: referenceDate)
+        
+        return (0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: -(6 - offset), to: startOfReferenceDay)
+        }
+    }
+    
+    // Build chart data for the active tab from real sessions.
+    var currentData: [MemberStats] {
+        guard !sessions.isEmpty else {
+            // Fallback: simple 0 line so chart layout stays stable
+            return dayAnchors.map { date in
+                MemberStats(month: dayFormatter.string(from: date), value: 0)
+            }
+        }
+        
+        let calendar = Calendar.current
+        
+        return dayAnchors.map { dayStart in
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+            
+            let daySessions = sessions.filter { session in
+                session.startTime >= dayStart && session.startTime < dayEnd
+            }
+            
+            let value: Double
+            switch selectedTab {
+            case "Vitamin D":
+                value = daySessions.reduce(0) { $0 + $1.totalIU }
+            case "Sessions":
+                value = Double(daySessions.count)
+            case "UV":
+                if daySessions.isEmpty {
+                    value = 0
+                } else {
+                    let totalUV = daySessions.reduce(0) { $0 + $1.averageUV }
+                    value = totalUV / Double(daySessions.count)
+                }
+            default:
+                value = daySessions.reduce(0) { $0 + $1.totalIU }
+            }
+            
+            return MemberStats(
+                month: dayFormatter.string(from: dayStart),
+                value: value
+            )
+        }
+    }
+    
+    // Total value label shown on the right, derived from real data.
+    var totalLabel: String {
+        switch selectedTab {
+        case "Vitamin D":
+            let total = sessions.reduce(0) { $0 + $1.totalIU }
+            if total < 1_000 {
+                return "\(Int(total))"
+            } else if total < 100_000 {
+                let formatter = NumberFormatter()
+                formatter.numberStyle = .decimal
+                formatter.maximumFractionDigits = 0
+                return formatter.string(from: NSNumber(value: total)) ?? "\(Int(total))"
+            } else {
+                return String(format: "%.0fK", total / 1_000)
+            }
+        case "Sessions":
+            return "\(sessions.count)"
+        case "UV":
+            guard !sessions.isEmpty else { return "0.0" }
+            let avgUV = sessions.reduce(0) { $0 + $1.averageUV } / Double(sessions.count)
+            return String(format: "%.1f", avgUV)
+        default:
+            return "0"
+        }
     }
     
     var body: some View {
@@ -63,8 +144,14 @@ struct MembersCardView: View {
                     
                     // Total Count - Step 4 (top-right position)
                     VStack(alignment: .trailing, spacing: 4) {
-                        RollingNumberView(value: totalMembers, font: .title.bold(), textColor: .white)
-                        Text("Total Members")
+                        RollingNumberView(value: totalLabel, font: .title.bold(), textColor: .white)
+                        Text(
+                            selectedTab == "Vitamin D"
+                            ? "Total IU (all time)"
+                            : selectedTab == "Sessions"
+                              ? "Total Sessions"
+                              : "Avg UV"
+                        )
                             .foregroundColor(.white.opacity(0.7))
                             .font(.caption2)
                     }
@@ -72,11 +159,11 @@ struct MembersCardView: View {
                 
                 // Title and description - Step 3
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Members")
+                    Text("History")
                         .foregroundColor(.white)
                         .font(.subheadline.bold())
                     
-                    Text("Manage, total course members\nand their progress")
+                    Text("Your vitamin D and session trends over recent days")
                         .foregroundColor(.white.opacity(0.7))
                         .font(.caption)
                         .fixedSize(horizontal: false, vertical: true)
