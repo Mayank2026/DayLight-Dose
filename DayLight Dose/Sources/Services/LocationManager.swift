@@ -14,6 +14,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var location: CLLocation?
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var isUpdatingLocation = false
+    @Published var locationServicesEnabled: Bool = true
+    @Published var showLocationDeniedAlert: Bool = false
     @Published var locationName: String = "" {
         didSet {
             // Share location name with widget
@@ -135,14 +137,57 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         switch authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
+            locationServicesEnabled = true
             startUpdatingLocation()
-        default:
+            showLocationDeniedAlert = false
+        case .denied:
+            // Services may still be enabled globally, but this app is denied
+            locationServicesEnabled = true
             stopUpdatingLocation()
+            // Only show the alert once per session
+            if !UserDefaults.standard.bool(forKey: "hasShownLocationDeniedAlert") {
+                showLocationDeniedAlert = true
+                UserDefaults.standard.set(true, forKey: "hasShownLocationDeniedAlert")
+            }
+        case .restricted:
+            // Usually indicates system-level restriction (e.g. parental controls)
+            locationServicesEnabled = false
+            stopUpdatingLocation()
+            if !UserDefaults.standard.bool(forKey: "hasShownLocationDeniedAlert") {
+                showLocationDeniedAlert = true
+                UserDefaults.standard.set(true, forKey: "hasShownLocationDeniedAlert")
+            }
+        case .notDetermined:
+            locationServicesEnabled = true
+            // User will be prompted when we call requestPermission()
+        @unknown default:
+            break
         }
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Silent error handling - errors are handled by checking location status
+    }
+    
+    // MARK: - Permission helpers
+    
+    func openSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    func resetLocationDeniedAlert() {
+        UserDefaults.standard.set(false, forKey: "hasShownLocationDeniedAlert")
+        showLocationDeniedAlert = false
+    }
+    
+    var locationDeniedMessage: String {
+        if !locationServicesEnabled {
+            return "Location Services are disabled. Please enable Location Services in Settings > Privacy & Security > Location Services."
+        } else {
+            return "DayLight Dose needs your location to determine UV levels and calculate vitamin D production. Please enable location access in Settings."
+        }
     }
     
     // MARK: - Geocoding Cache
