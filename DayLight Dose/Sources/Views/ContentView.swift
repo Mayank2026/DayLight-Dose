@@ -510,6 +510,10 @@ User stats for a personalised sunlight and vitamin D summary:
         .onChange(of: userPreferences.first) { _ in
             syncPreferencesFromUser()
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Reset one-time location alert flag when app becomes active
+            locationManager.resetLocationDeniedAlert()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Check for updated skin type and adaptation when app returns to foreground
             vitaminDCalculator.setHealthManager(healthManager)
@@ -572,6 +576,13 @@ User stats for a personalised sunlight and vitamin D summary:
         .onOpenURL { url in
             handleURL(url)
         }
+        .alert("Location access needed",
+               isPresented: $locationManager.showLocationDeniedAlert,
+               actions: {
+                   Button("OK", role: .cancel) { }
+               }, message: {
+                   Text(locationManager.locationDeniedMessage)
+               })
     }
     
     private var backgroundGradient: some View {
@@ -638,14 +649,45 @@ User stats for a personalised sunlight and vitamin D summary:
     
     private var uvSection: some View {
         VStack(spacing: 8) {
-            Text("UV INDEX")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundColor(.white.opacity(0.7))
-                .tracking(1.5)
-            
-            Text(String(format: "%.1f", uvService.currentUV))
-                .font(.system(size: 72, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+            if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
+                VStack(spacing: 12) {
+                    Image(systemName: "location.slash")
+                        .font(.system(size: 40))
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    Text("LOCATION ACCESS REQUIRED")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                        .tracking(1.5)
+                    
+                    Text("Enable location to get accurate UV and vitamin D estimates.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                    
+                    Button(action: {
+                        locationManager.openSettings()
+                    }) {
+                        Text("Enable Location")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(20)
+                    }
+                }
+            } else {
+                Text("UV INDEX")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+                    .tracking(1.5)
+                
+                Text(String(format: "%.1f", uvService.currentUV))
+                    .font(.system(size: 72, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
             
             HStack(spacing: 15) {
                 VStack(spacing: 3) {
