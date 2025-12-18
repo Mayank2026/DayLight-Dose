@@ -22,23 +22,23 @@ DayLight Dose features dynamic color themes that adapt to different times of day
 
 ### Morning / Sunrise
 
-![Morning Screenshot](screenshots/morning-app.png)
-![Morning Widget](screenshots/morning-widget.png)
+<img src="screenshots/morning-app.png" alt="Morning Screenshot" width="300">
+<img src="screenshots/morning-widget.png" alt="Morning Widget" width="300">
 
 ### Midday / Peak UV Hours
 
-![Midday Screenshot](screenshots/midday-app.png)
-![Midday Widget](screenshots/midday-widget.png)
+<img src="screenshots/midday-app.png" alt="Midday Screenshot" width="300">
+<img src="screenshots/midday-widget.png" alt="Midday Widget" width="300">
 
 ### Evening / Sunset
 
-![Evening Screenshot](screenshots/evening-app.png)
-![Evening Widget](screenshots/evening-widget.png)
+<img src="screenshots/evening-app.png" alt="Evening Screenshot" width="300">
+<img src="screenshots/evening-widget.png" alt="Evening Widget" width="300">
 
 ### Night
 
-![Night Screenshot](screenshots/night-app.png)
-![Night Widget](screenshots/night-widget.png)
+<img src="screenshots/night-app.png" alt="Night Screenshot" width="300">
+<img src="screenshots/night-widget.png" alt="Night Widget" width="300">
 
 ## Features
 
