@@ -323,6 +323,7 @@ struct ContentView: View {
                             exposureToggle
                             clothingSection
                             skinTypeSection
+                            MembersCardView()
                             // --- Summary Section ---
                             if #available(iOS 26, *) {
                                 VStack(alignment: .leading, spacing: 18) {
