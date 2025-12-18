@@ -9,6 +9,7 @@ import Foundation
 import CoreLocation
 import WidgetKit
 import Combine
+import UIKit
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var location: CLLocation?
