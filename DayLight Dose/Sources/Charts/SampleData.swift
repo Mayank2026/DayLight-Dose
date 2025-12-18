@@ -1,73 +1,60 @@
 //
 //  SampleData.swift
-//  UITest
+//  DayLight Dose
 //
 //  Created by Avineet Singh on 12/12/25.
 //
 
 import Foundation
 
-// Sample data for different member categories
+/// Sample data for previews and experimentation with the chart components.
+/// The live UI now uses real `VitaminDSession` data; this remains for Xcode previews
+/// or for using the chart views in isolation.
 struct SampleData {
-    // All Members Data
-    static let allMembersData: [MemberStats] = [
-        .init(month: "Jan", value: 210),
-        .init(month: "Feb", value: 530),
-        .init(month: "Mar", value: 375),
-        .init(month: "Apr", value: 420),
-        .init(month: "May", value: 380),
-        .init(month: "Jun", value: 632),
-        .init(month: "Jul", value: 610)
+    // Example: total vitamin D per day (IU) over a week
+    static let dailyVitaminD: [MemberStats] = [
+        .init(month: "Mon", value: 850),
+        .init(month: "Tue", value: 1200),
+        .init(month: "Wed", value: 640),
+        .init(month: "Thu", value: 980),
+        .init(month: "Fri", value: 1500),
+        .init(month: "Sat", value: 1320),
+        .init(month: "Sun", value: 700)
     ]
     
-    // Active Members Data
-    static let activeMembersData: [MemberStats] = [
-        .init(month: "Jan", value: 180),
-        .init(month: "Feb", value: 450),
-        .init(month: "Mar", value: 320),
-        .init(month: "Apr", value: 380),
-        .init(month: "May", value: 340),
-        .init(month: "Jun", value: 520),
-        .init(month: "Jul", value: 490)
+    // Example: number of tracked sessions per day
+    static let dailySessions: [MemberStats] = [
+        .init(month: "Mon", value: 1),
+        .init(month: "Tue", value: 2),
+        .init(month: "Wed", value: 1),
+        .init(month: "Thu", value: 2),
+        .init(month: "Fri", value: 3),
+        .init(month: "Sat", value: 2),
+        .init(month: "Sun", value: 1)
     ]
     
-    // Enrolled Members Data
-    static let enrolledMembersData: [MemberStats] = [
-        .init(month: "Jan", value: 150),
-        .init(month: "Feb", value: 380),
-        .init(month: "Mar", value: 280),
-        .init(month: "Apr", value: 340),
-        .init(month: "May", value: 310),
-        .init(month: "Jun", value: 450),
-        .init(month: "Jul", value: 420)
+    // Example: average UV index per day
+    static let dailyAverageUV: [MemberStats] = [
+        .init(month: "Mon", value: 3.2),
+        .init(month: "Tue", value: 4.5),
+        .init(month: "Wed", value: 2.8),
+        .init(month: "Thu", value: 3.9),
+        .init(month: "Fri", value: 5.1),
+        .init(month: "Sat", value: 4.3),
+        .init(month: "Sun", value: 2.5)
     ]
     
-    // Total members count for each category
-    static func totalMembers(for category: String) -> String {
-        switch category {
-        case "All":
-            return "1,930"
-        case "Active":
-            return "1,420"
-        case "Enrolled":
-            return "1,180"
+    /// Convenience getter for previews to pick the appropriate sample set.
+    static func data(for metric: String) -> [MemberStats] {
+        switch metric {
+        case "Vitamin D":
+            return dailyVitaminD
+        case "Sessions":
+            return dailySessions
+        case "UV":
+            return dailyAverageUV
         default:
-            return "1,930"
-        }
-    }
-    
-    // Get data for a specific category
-    static func data(for category: String) -> [MemberStats] {
-        switch category {
-        case "All":
-            return allMembersData
-        case "Active":
-            return activeMembersData
-        case "Enrolled":
-            return enrolledMembersData
-        default:
-            return enrolledMembersData
+            return dailyVitaminD
         }
     }
 }
-
