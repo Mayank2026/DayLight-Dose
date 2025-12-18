@@ -16,6 +16,30 @@ DayLight Dose is an AI-powered iOS app designed for people suffering from vitami
 
 https://drive.google.com/file/d/1XwW2SqBMng0wWIQEU_qAnxGiMsZQze2m/view?usp=share_link
 
+## Snapshots
+
+DayLight Dose features dynamic color themes that adapt to different times of day, reflecting the natural progression from sunrise to sunset to night. The app and widgets intelligently change colors to match the time and lighting conditions, creating an immersive experience that aligns with your vitamin D tracking journey.
+
+### Morning / Sunrise
+
+![Morning Screenshot](screenshots/morning-app.png)
+![Morning Widget](screenshots/morning-widget.png)
+
+### Midday / Peak UV Hours
+
+![Midday Screenshot](screenshots/midday-app.png)
+![Midday Widget](screenshots/midday-widget.png)
+
+### Evening / Sunset
+
+![Evening Screenshot](screenshots/evening-app.png)
+![Evening Widget](screenshots/evening-widget.png)
+
+### Night
+
+![Night Screenshot](screenshots/night-app.png)
+![Night Widget](screenshots/night-widget.png)
+
 ## Features
 
 - Real-time UV index from your location
