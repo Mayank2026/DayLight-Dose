@@ -12,6 +12,7 @@ import UserNotifications
 import WidgetKit
 import UIKit
 import SwiftData
+import OSLog
 
 enum ClothingLevel: Int, CaseIterable {
     case none = -1
@@ -150,6 +151,16 @@ class VitaminDCalculator: ObservableObject {
     private var appBackgroundObserver: NSObjectProtocol?
     private var wasTrackingBeforeBackground = false
     private var modelContext: ModelContext?
+    private var lastWidgetUpdateTime: Date?
+    private let widgetUpdateThrottle: TimeInterval = 60.0
+    private var todaysHealthBase: Double = 0.0
+    private var lastHealthBaseRefreshTime: Date?
+    private let healthBaseRefreshInterval: TimeInterval = 900.0 // 15 minutes
+    #if DEBUG
+    private static let logger = Logger(subsystem: "com.mayank.daylightdose", category: "VitaminDCalculator")
+    private let signposter = OSSignposter(subsystem: "com.mayank.daylightdose", category: "VitaminDCalculator")
+    private var sessionInterval: OSSignpostIntervalState?
+    #endif
     
     // UV response curve parameters
     private let uvHalfMax = 4.0  // UV index for 50% vitamin D synthesis rate (more linear)
@@ -178,6 +189,7 @@ class VitaminDCalculator: ObservableObject {
         checkHealthKitSkinType()
         checkHealthKitAge()
         updateAdaptationFactor()
+        refreshTodaysHealthBase(force: true)
     }
     
     func setUVService(_ uvService: UVService) {
@@ -265,6 +277,12 @@ class VitaminDCalculator: ObservableObject {
             self.updateMEDExposure(uvIndex: currentUV)
         }
         
+        #if DEBUG
+        let state = signposter.beginInterval("Session")
+        sessionInterval = state
+        Self.logger.debug("Session start uv=\(uvIndex, privacy: .public)")
+        #endif
+        
         updateVitaminDRate(uvIndex: uvIndex)
     }
     
@@ -306,7 +324,15 @@ class VitaminDCalculator: ObservableObject {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["burnWarning"])
         
         // Update widget data
-        updateWidgetData()
+        updateWidgetData(force: true)
+        
+        #if DEBUG
+        if let state = sessionInterval {
+            signposter.endInterval("Session", state)
+            sessionInterval = nil
+        }
+        Self.logger.debug("Session stop totalIU=\(self.sessionVitaminD, privacy: .public)")
+        #endif
     }
     
     func updateUV(_ uvIndex: Double) {
@@ -420,6 +446,9 @@ class VitaminDCalculator: ObservableObject {
     
     func toggleSunExposure(uvIndex: Double) {
         isInSun.toggle()
+        #if DEBUG
+        Self.logger.debug("Toggle exposure isInSun=\(self.isInSun, privacy: .public) uv=\(uvIndex, privacy: .public)")
+        #endif
         
         if isInSun {
             startSession(uvIndex: uvIndex)
@@ -590,24 +619,61 @@ class VitaminDCalculator: ObservableObject {
         }
     }
     
-    private func updateWidgetData() {
+    private func updateWidgetData(force: Bool = false) {
         guard let uvService = uvService else { return }
         
+        let now = Date()
+        if !force, let last = lastWidgetUpdateTime, now.timeIntervalSince(last) < widgetUpdateThrottle {
+            return
+        }
+        lastWidgetUpdateTime = now
+        
+        // Always keep core fields fresh
         sharedDefaults?.set(uvService.currentUV, forKey: "currentUV")
         sharedDefaults?.set(isInSun, forKey: "isTracking")
         sharedDefaults?.set(currentVitaminDRate, forKey: "vitaminDRate")
         
-        // Calculate today's total including current session
+        // Refresh today's Health base occasionally, then add live session on top
+        let shouldRefreshBase: Bool
+        if force || lastHealthBaseRefreshTime == nil {
+            shouldRefreshBase = true
+        } else if let last = lastHealthBaseRefreshTime {
+            shouldRefreshBase = now.timeIntervalSince(last) >= healthBaseRefreshInterval
+        } else {
+            shouldRefreshBase = true
+        }
+        
+        if shouldRefreshBase {
+            refreshTodaysHealthBase(force: force)
+        } else {
+            // Use cached base + live session
+            let todaysTotal = todaysHealthBase + sessionVitaminD
+            sharedDefaults?.set(todaysTotal, forKey: "todaysTotal")
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+    
+    private func refreshTodaysHealthBase(force: Bool) {
+        guard let healthManager = healthManager else {
+            // No Health manager; just treat base as zero
+            todaysHealthBase = 0
+            let total = todaysHealthBase + sessionVitaminD
+            sharedDefaults?.set(total, forKey: "todaysTotal")
+            WidgetCenter.shared.reloadAllTimelines()
+            return
+        }
+        
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
         
-        healthManager?.readVitaminDIntake(from: startOfDay, to: endOfDay) { [weak self] total, error in
+        healthManager.readVitaminDIntake(from: startOfDay, to: endOfDay) { [weak self] total, _ in
             guard let self = self else { return }
-            let todaysTotal = total + self.sessionVitaminD
+            let base = total
+            self.todaysHealthBase = base
+            self.lastHealthBaseRefreshTime = Date()
+            let todaysTotal = base + self.sessionVitaminD
             self.sharedDefaults?.set(todaysTotal, forKey: "todaysTotal")
-            
-            // Trigger widget update
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
