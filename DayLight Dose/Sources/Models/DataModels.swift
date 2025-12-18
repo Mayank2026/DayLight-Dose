@@ -13,14 +13,16 @@ final class UserPreferences {
     var clothingLevel: Int = 1 // Default to light clothing
     var skinType: Int = 3 // Default to type 3
     var userAge: Int = 30
+    var useAgeFactor: Bool = true
     var hasCompletedOnboarding: Bool = false // Tracks if onboarding is complete
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     
-    init(clothingLevel: Int = 1, skinType: Int = 3, userAge: Int = 30) {
+    init(clothingLevel: Int = 1, skinType: Int = 3, userAge: Int = 30, useAgeFactor: Bool = true) {
         self.clothingLevel = clothingLevel
         self.skinType = skinType
         self.userAge = userAge
+        self.useAgeFactor = useAgeFactor
         self.createdAt = Date()
         self.updatedAt = Date()
     }

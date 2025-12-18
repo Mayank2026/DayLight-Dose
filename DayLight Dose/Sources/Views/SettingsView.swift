@@ -57,6 +57,19 @@ struct SettingsView: View {
                                 .foregroundColor(.white)
                             }
                             .listRowBackground(Color.black.opacity(0.2))
+                            
+                            Toggle(isOn: Binding(
+                                get: { prefs.useAgeFactor },
+                                set: { newValue in
+                                    prefs.useAgeFactor = newValue
+                                    prefs.updatedAt = Date()
+                                    try? modelContext.save()
+                                }
+                            )) {
+                                Text("Account for age in calculations")
+                                    .foregroundColor(.white)
+                            }
+                            .listRowBackground(Color.black.opacity(0.2))
                         }
                     }
                     Section("App Settings") {
@@ -153,6 +166,7 @@ struct HealthInsightsPreferencesView: View {
     @State private var selectedSkinType = 3
     @State private var selectedClothingLevel = 1
     @State private var userAge = 30
+    @State private var useAgeFactor = true
     @State private var showingAgePicker = false
 
     var body: some View {
@@ -225,6 +239,12 @@ struct HealthInsightsPreferencesView: View {
                             .background(Color.white.opacity(0.15))
                             .cornerRadius(12)
                         }
+                        
+                        Toggle(isOn: $useAgeFactor) {
+                            Text("Account for age in calculations")
+                                .foregroundColor(.white)
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .orange))
                     }
                 }
                 .padding(.horizontal, 20)
@@ -248,6 +268,7 @@ struct HealthInsightsPreferencesView: View {
                 selectedSkinType = prefs.skinType
                 selectedClothingLevel = prefs.clothingLevel
                 userAge = prefs.userAge
+                useAgeFactor = prefs.useAgeFactor
             }
         }
     }
@@ -257,6 +278,7 @@ struct HealthInsightsPreferencesView: View {
         prefs.skinType = selectedSkinType
         prefs.clothingLevel = selectedClothingLevel
         prefs.userAge = userAge
+        prefs.useAgeFactor = useAgeFactor
         prefs.updatedAt = Date()
         if userPreferences.isEmpty {
             modelContext.insert(prefs)

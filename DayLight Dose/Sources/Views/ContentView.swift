@@ -1350,6 +1350,7 @@ User stats for a personalised sunlight and vitamin D summary:
             vitaminDCalculator.clothingLevel = clothingLevel
         }
         vitaminDCalculator.userAge = prefs.userAge
+        vitaminDCalculator.useAgeFactor = prefs.useAgeFactor
     }
     
     // Helper to update widget shared data

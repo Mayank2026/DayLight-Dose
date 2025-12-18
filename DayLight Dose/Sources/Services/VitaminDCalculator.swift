@@ -135,6 +135,11 @@ class VitaminDCalculator: ObservableObject {
             UserDefaults.standard.set(userAge, forKey: "userAge")
         }
     }
+    @Published var useAgeFactor: Bool = true {
+        didSet {
+            UserDefaults.standard.set(useAgeFactor, forKey: "useAgeFactor")
+        }
+    }
     @Published var ageFromHealth = false
     @Published var currentUVQualityFactor: Double = 1.0
     @Published var currentAdaptationFactor: Double = 1.0
@@ -219,6 +224,10 @@ class VitaminDCalculator: ObservableObject {
         
         if let savedAge = UserDefaults.standard.object(forKey: "userAge") as? Int {
             userAge = savedAge
+        }
+        
+        if let savedUseAge = UserDefaults.standard.object(forKey: "useAgeFactor") as? Bool {
+            useAgeFactor = savedUseAge
         }
     }
     
@@ -365,13 +374,17 @@ class VitaminDCalculator: ObservableObject {
         // Age factor: vitamin D synthesis decreases with age
         // ~25% synthesis at age 70 compared to age 20
         let ageFactor: Double
-        if userAge <= 20 {
-            ageFactor = 1.0
-        } else if userAge >= 70 {
-            ageFactor = 0.25
+        if useAgeFactor {
+            if userAge <= 20 {
+                ageFactor = 1.0
+            } else if userAge >= 70 {
+                ageFactor = 0.25
+            } else {
+                // Linear decrease: lose ~1% per year after age 20
+                ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+            }
         } else {
-            // Linear decrease: lose ~1% per year after age 20
-            ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+            ageFactor = 1.0
         }
         
         // Calculate UV quality factor based on time of day
@@ -426,12 +439,16 @@ class VitaminDCalculator: ObservableObject {
         
         // Age factor: reuse the same logic as for live rate
         let ageFactor: Double
-        if userAge <= 20 {
-            ageFactor = 1.0
-        } else if userAge >= 70 {
-            ageFactor = 0.25
+        if useAgeFactor {
+            if userAge <= 20 {
+                ageFactor = 1.0
+            } else if userAge >= 70 {
+                ageFactor = 0.25
+            } else {
+                ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+            }
         } else {
-            ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+            ageFactor = 1.0
         }
         
         // Use current adaptation factor (falls back to 1.0 by default)

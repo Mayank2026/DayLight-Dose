@@ -177,6 +177,7 @@ struct OnboardingView: View {
         prefs.skinType = selectedSkinType
         prefs.clothingLevel = selectedClothingLevel
         prefs.userAge = userAge
+        prefs.useAgeFactor = true
         prefs.hasCompletedOnboarding = true
         prefs.updatedAt = Date()
         if userPreferences.isEmpty {
