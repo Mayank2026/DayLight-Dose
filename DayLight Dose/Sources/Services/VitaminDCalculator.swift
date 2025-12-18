@@ -376,6 +376,48 @@ class VitaminDCalculator: ObservableObject {
         updateWidgetData()
     }
     
+    /// Standalone vitamin D calculation for a given UV, duration, and exposure factors.
+    /// Used for manual session logging so it stays consistent with the live model.
+    func calculateVitaminD(uvIndex: Double,
+                           exposureMinutes: Double,
+                           skinType: SkinType,
+                           clothingLevel: ClothingLevel,
+                           sunscreenLevel: SunscreenLevel = .none) -> Double {
+        // Base rate: 21000 IU/hr for Type 3 skin with minimal clothing (80% exposure)
+        let baseRate = 21000.0
+        
+        // Apply sunscreen transmission
+        let effectiveUV = max(0, uvIndex * sunscreenLevel.uvTransmissionFactor)
+        
+        // UV factor: same saturation curve as live tracking
+        let uvFactor = (effectiveUV * uvMaxFactor) / (uvHalfMax + effectiveUV)
+        
+        // Exposure based on clothing coverage
+        let exposureFactor = clothingLevel.exposureFactor
+        
+        // Skin type affects vitamin D synthesis efficiency
+        let skinFactor = skinType.vitaminDFactor
+        
+        // Age factor: reuse the same logic as for live rate
+        let ageFactor: Double
+        if userAge <= 20 {
+            ageFactor = 1.0
+        } else if userAge >= 70 {
+            ageFactor = 0.25
+        } else {
+            ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+        }
+        
+        // Use current adaptation factor (falls back to 1.0 by default)
+        let adaptationFactor = currentAdaptationFactor
+        
+        // Hourly rate with all factors applied
+        let hourlyRate = baseRate * uvFactor * exposureFactor * skinFactor * ageFactor * adaptationFactor
+        
+        // Convert to amount for the requested minutes
+        return hourlyRate * (exposureMinutes / 60.0)
+    }
+    
     func toggleSunExposure(uvIndex: Double) {
         isInSun.toggle()
         
