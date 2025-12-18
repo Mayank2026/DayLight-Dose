@@ -22,23 +22,63 @@ DayLight Dose features dynamic color themes that adapt to different times of day
 
 ### Morning / Sunrise
 
-<img src="screenshots/morning-app.png" alt="Morning Screenshot" width="300">
-<img src="screenshots/morning-widget.png" alt="Morning Widget" width="300">
+<table>
+<tr>
+<td width="50%">
+<img src="screenshots/morning-app.png" alt="Morning Screenshot" width="100%">
+<p align="center"><strong>Morning App</strong></p>
+</td>
+<td width="50%">
+<img src="screenshots/morning-widget.png" alt="Morning Widget" width="100%">
+<p align="center"><strong>Morning Widget</strong></p>
+</td>
+</tr>
+</table>
 
 ### Midday / Peak UV Hours
 
-<img src="screenshots/midday-app.png" alt="Midday Screenshot" width="300">
-<img src="screenshots/midday-widget.png" alt="Midday Widget" width="300">
+<table>
+<tr>
+<td width="50%">
+<img src="screenshots/midday-app.png" alt="Midday Screenshot" width="100%">
+<p align="center"><strong>Midday App</strong></p>
+</td>
+<td width="50%">
+<img src="screenshots/midday-widget.png" alt="Midday Widget" width="100%">
+<p align="center"><strong>Midday Widget</strong></p>
+</td>
+</tr>
+</table>
 
 ### Evening / Sunset
 
-<img src="screenshots/evening-app.png" alt="Evening Screenshot" width="300">
-<img src="screenshots/evening-widget.png" alt="Evening Widget" width="300">
+<table>
+<tr>
+<td width="50%">
+<img src="screenshots/evening-app.png" alt="Evening Screenshot" width="100%">
+<p align="center"><strong>Evening App</strong></p>
+</td>
+<td width="50%">
+<img src="screenshots/evening-widget.png" alt="Evening Widget" width="100%">
+<p align="center"><strong>Evening Widget</strong></p>
+</td>
+</tr>
+</table>
 
 ### Night
 
-<img src="screenshots/night-app.png" alt="Night Screenshot" width="300">
-<img src="screenshots/night-widget.png" alt="Night Widget" width="300">
+<table>
+<tr>
+<td width="50%">
+<img src="screenshots/night-app.png" alt="Night Screenshot" width="100%">
+<p align="center"><strong>Night App</strong></p>
+</td>
+<td width="50%">
+<img src="screenshots/night-widget.png" alt="Night Widget" width="100%">
+<p align="center"><strong>Night Widget</strong></p>
+</td>
+</tr>
+</table>
 
 ## Features
 
