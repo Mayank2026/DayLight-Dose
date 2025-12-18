@@ -1493,6 +1493,7 @@ struct ManualExposureSheet: View {
     @EnvironmentObject var vitaminDCalculator: VitaminDCalculator
     @EnvironmentObject var healthManager: HealthManager
     @EnvironmentObject var uvService: UVService
+    @EnvironmentObject var locationManager: LocationManager
     @Environment(\.modelContext) private var modelContext
     
     @State private var date = Date()
@@ -1501,6 +1502,8 @@ struct ManualExposureSheet: View {
     @State private var clothingLevel: ClothingLevel = .light
     @State private var sunscreenLevel: SunscreenLevel = .none
     @State private var isSaving = false
+    @State private var isDetectingUV = false
+    @State private var detectError: String?
     
     var body: some View {
         NavigationView {
@@ -1522,6 +1525,39 @@ struct ManualExposureSheet: View {
                             .frame(width: 180)
                         Text(String(format: "%.1f", manualUVIndex))
                             .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Location")) {
+                    if let loc = locationManager.location {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(locationManager.locationName.isEmpty ? "Current location" : locationManager.locationName)
+                            Text(String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("Waiting for current location…")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Button {
+                        Task { await detectUVForSelectedTime() }
+                    } label: {
+                        HStack {
+                            if isDetectingUV {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                            Text(isDetectingUV ? "Detecting…" : "Detect UV for this time")
+                        }
+                    }
+                    .disabled(isDetectingUV || locationManager.location == nil)
+                    
+                    if let error = detectError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
                     }
                 }
                 
@@ -1570,6 +1606,79 @@ struct ManualExposureSheet: View {
             clothingLevel: clothingLevel,
             sunscreenLevel: sunscreenLevel
         )
+    }
+    
+    @MainActor
+    private func detectUVForSelectedTime() async {
+        detectError = nil
+        guard !isDetectingUV else { return }
+        guard let location = locationManager.location else {
+            detectError = "No current location available."
+            return
+        }
+        
+        isDetectingUV = true
+        defer { isDetectingUV = false }
+        
+        do {
+            let detected = try await fetchUVIndex(for: location, at: date)
+            manualUVIndex = max(0, min(12, detected))
+        } catch {
+            detectError = "Could not detect UV: \(error.localizedDescription)"
+        }
+    }
+    
+    private func fetchUVIndex(for location: CLLocation, at date: Date) async throws -> Double {
+        let latitude = location.coordinate.latitude
+        let longitude = location.coordinate.longitude
+        let altitude = location.altitude
+        
+        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&elevation=\(altitude)&hourly=uv_index&timezone=auto&forecast_days=2"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+        
+        struct HourlyResponse: Decodable {
+            struct Hourly: Decodable {
+                let time: [String]
+                let uvIndex: [Double]
+                
+                enum CodingKeys: String, CodingKey {
+                    case time
+                    case uvIndex = "uv_index"
+                }
+            }
+            let hourly: Hourly
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let response = try JSONDecoder().decode(HourlyResponse.self, from: data)
+        
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        let startOfTarget = calendar.startOfDay(for: date)
+        let dayOffset = calendar.dateComponents([.day], from: startOfToday, to: startOfTarget).day ?? 0
+        guard dayOffset >= 0, dayOffset <= 1 else {
+            throw NSError(domain: "ManualExposureSheet", code: 1, userInfo: [NSLocalizedDescriptionKey: "Only today and tomorrow are supported."])
+        }
+        
+        let hour = calendar.component(.hour, from: date)
+        let minute = calendar.component(.minute, from: date)
+        let baseIndex = dayOffset * 24 + hour
+        let hourlyUV = response.hourly.uvIndex
+        guard baseIndex < hourlyUV.count else {
+            throw NSError(domain: "ManualExposureSheet", code: 2, userInfo: [NSLocalizedDescriptionKey: "UV data unavailable for this time."])
+        }
+        
+        let currentHourUV = hourlyUV[baseIndex]
+        let interpolationFactor = Double(minute) / 60.0
+        var interpolatedUV = currentHourUV
+        if baseIndex + 1 < hourlyUV.count {
+            let nextHourUV = hourlyUV[baseIndex + 1]
+            interpolatedUV = currentHourUV + (nextHourUV - currentHourUV) * interpolationFactor
+        }
+        
+        return interpolatedUV
     }
     
     private func saveSession() {
