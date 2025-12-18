@@ -263,6 +263,9 @@ struct ContentView: View {
     @State private var showSkinTypePicker = false
     @State private var showSunscreenPicker = false
     @State private var showManualExposureSheet = false
+    @State private var showSessionCompletionSheet = false
+    @State private var pendingSessionStartTime: Date? = nil
+    @State private var pendingSessionAmount: Double = 0
     @State private var todaysTotal: Double = 0
     @State private var currentGradientColors: [Color] = []
     @State private var showInfoSheet = false
@@ -788,7 +791,16 @@ User stats for a personalised sunlight and vitamin D summary:
                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                 impactFeedback.impactOccurred()
                 
-                vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
+                if vitaminDCalculator.isInSun,
+                   vitaminDCalculator.sessionVitaminD > 0,
+                   let startTime = vitaminDCalculator.sessionStartTime {
+                    // Defer ending the session until after user confirms in the sheet
+                    pendingSessionStartTime = startTime
+                    pendingSessionAmount = vitaminDCalculator.sessionVitaminD
+                    showSessionCompletionSheet = true
+                } else {
+                    vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
+                }
             }) {
                 HStack {
                     Image(systemName: vitaminDCalculator.isInSun ? "sun.max.fill" :
@@ -932,6 +944,34 @@ User stats for a personalised sunlight and vitamin D summary:
         }
         .sheet(isPresented: $showManualExposureSheet) {
             ManualExposureSheet()
+        }
+        .sheet(isPresented: $showSessionCompletionSheet) {
+            if let startTime = pendingSessionStartTime {
+                SessionCompletionSheet(
+                    sessionStartTime: startTime,
+                    sessionAmount: pendingSessionAmount,
+                    onSave: {
+                        // End the session and let existing logic save to Health + SwiftData
+                        vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
+                        // Reset pending state
+                        pendingSessionStartTime = nil
+                        pendingSessionAmount = 0
+                    },
+                    onCancel: {
+                        // Keep tracking; just reset pending state
+                        pendingSessionStartTime = nil
+                        pendingSessionAmount = 0
+                    }
+                )
+                .environmentObject(vitaminDCalculator)
+                .environmentObject(healthManager)
+                .preferredColorScheme(.dark)
+            } else {
+                // Fallback placeholder if for some reason we have no pending data
+                ProgressView()
+                    .tint(.white)
+                    .preferredColorScheme(.dark)
+            }
         }
     }
     
@@ -1533,6 +1573,92 @@ struct ManualExposureSheet: View {
         WidgetCenter.shared.reloadAllTimelines()
         
         dismiss()
+    }
+}
+
+struct SessionCompletionSheet: View {
+    let sessionStartTime: Date
+    let sessionAmount: Double
+    let onSave: () -> Void
+    let onCancel: () -> Void
+    
+    @Environment(\.dismiss) var dismiss
+    
+    private var dateFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }
+    
+    private var durationText: String {
+        let minutes = Int(Date().timeIntervalSince(sessionStartTime) / 60)
+        if minutes <= 0 {
+            return "< 1 min"
+        } else if minutes == 1 {
+            return "1 min"
+        } else {
+            return "\(minutes) mins"
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("End this session?")
+                        .font(.title3.bold())
+                    
+                    Text("We'll save this vitamin D session to your history and Apple Health.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Started")
+                        Spacer()
+                        Text(dateFormatter.string(from: sessionStartTime))
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Duration")
+                        Spacer()
+                        Text(durationText)
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Vitamin D")
+                        Spacer()
+                        Text("\(Int(sessionAmount)) IU")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Complete Session")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave()
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 struct SunscreenPicker: View {
