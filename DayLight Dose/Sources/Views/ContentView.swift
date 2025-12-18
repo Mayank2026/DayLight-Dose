@@ -261,6 +261,7 @@ struct ContentView: View {
     
     @State private var showClothingPicker = false
     @State private var showSkinTypePicker = false
+    @State private var showSunscreenPicker = false
     @State private var todaysTotal: Double = 0
     @State private var currentGradientColors: [Color] = []
     @State private var showInfoSheet = false
@@ -808,31 +809,69 @@ User stats for a personalised sunlight and vitamin D summary:
     }
     
     private var clothingSection: some View {
-        Button(action: { showClothingPicker.toggle() }) {
-            VStack(spacing: 10) {
-                Text("CLOTHING")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white.opacity(0.7))
-                    .tracking(1.5)
-                
-                HStack {
-                    Text(vitaminDCalculator.clothingLevel.description)
-                        .font(.system(size: 16, weight: .medium))
+        HStack(spacing: 12) {
+            // Clothing picker
+            Button(action: { showClothingPicker.toggle() }) {
+                VStack(spacing: 10) {
+                    Text("CLOTHING")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .tracking(1.5)
                     
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12))
+                    HStack {
+                        Text(vitaminDCalculator.clothingLevel.description)
+                            .font(.system(size: 16, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.white)
                 }
-                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Color.black.opacity(0.2))
+                .cornerRadius(15)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(Color.black.opacity(0.2))
-            .cornerRadius(15)
-        }
-        .sheet(isPresented: $showClothingPicker) {
-            ClothingPicker(selection: $vitaminDCalculator.clothingLevel)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+            .sheet(isPresented: $showClothingPicker) {
+                ClothingPicker(selection: $vitaminDCalculator.clothingLevel)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+            
+            // Sunscreen picker
+            Button(action: { showSunscreenPicker.toggle() }) {
+                VStack(spacing: 10) {
+                    Text("SUNSCREEN")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .tracking(1.5)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "shield.lefthalf.fill")
+                            .font(.system(size: 12))
+                        
+                        Text(vitaminDCalculator.sunscreenLevel.description)
+                            .font(.system(size: 16, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Color.black.opacity(0.2))
+                .cornerRadius(15)
+            }
+            .sheet(isPresented: $showSunscreenPicker) {
+                SunscreenPicker(selection: $vitaminDCalculator.sunscreenLevel)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
     
@@ -1339,6 +1378,39 @@ struct SkinTypePicker: View {
         case .type5: return Color(red: 0.63, green: 0.47, blue: 0.36)     // Dark brown
         case .type6: return Color(red: 0.4, green: 0.26, blue: 0.18)      // Very dark brown
         }
+    }
+}
+
+struct SunscreenPicker: View {
+    @Binding var selection: SunscreenLevel
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(SunscreenLevel.allCases, id: \.self) { level in
+                    Button(action: {
+                        selection = level
+                        dismiss()
+                    }) {
+                        HStack {
+                            Text(level.description)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if selection == level {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Sunscreen")
+            .navigationBarItems(trailing: Button("Done") { dismiss() })
+            .preferredColorScheme(.dark)
+        }
+        .presentationBackground(Color(UIColor.systemBackground).opacity(0.99))
     }
 }
 
