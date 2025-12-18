@@ -14,6 +14,59 @@ import Foundation
 import FoundationModels
 import SwiftUI
 
+// --- Guided generation models for AI summaries ---
+@Generable
+struct DailySummary {
+    @Guide(description: "A 2–3 sentence overview of the user's current sunlight and vitamin D status, explicitly referencing UV index, vitamin D rate, clothing, skin type, and today's total vitamin D.")
+    let overview: String
+    
+    @Guide(description: "Two concise, concrete tips tailored to the user's stats. Focus on safe sun exposure and vitamin D optimisation for the rest of the day, without assuming time of day and without repeating generic advice.")
+    let tips: [DailyTip]
+}
+
+@Generable
+struct DailyTip {
+    @Guide(description: "A short, punchy title for the tip, like 'Adjust Midday Exposure' or 'Balance Supplements and Sun'. Do NOT include markdown characters such as ** or bullet markers.")
+    let title: String
+    
+    @Guide(description: "1–2 sentences of actionable advice based on the user's actual stats.")
+    let body: String
+}
+
+@Generable
+struct SessionSummary {
+    @Guide(description: "A 2–3 sentence friendly summary of this single vitamin D session, describing vitamin D absorption, how effective the session was, and how UV, clothing, skin type, and age contributed.")
+    let summary: String
+    
+    @Guide(description: "1–3 concise insights or notable patterns about this session (for example, efficiency, timing, or intensity), without giving prescriptive tips or advice.")
+    let insights: String
+}
+
+// MARK: - Guided-generation helpers
+
+enum TextGenerationMode {
+    case dailySummary
+    case sessionAnalysis
+}
+
+// The streaming API yields `DailySummary.PartiallyGenerated`, so we accept that here
+private func renderDailySummary(from summary: DailySummary.PartiallyGenerated) -> String {
+    var sections: [String] = []
+    
+    if let overview = summary.overview {
+        sections.append("**Sunshine and Vitamin D Overview:** \(overview)")
+    }
+    
+    return sections.joined(separator: "\n\n")
+}
+
+// Likewise, the session analysis stream yields `SessionSummary.PartiallyGenerated`
+private func renderSessionSummary(from summary: SessionSummary.PartiallyGenerated) -> String {
+    // Only show the high-level session summary here.
+    // Detailed insights are surfaced separately in the dedicated "Session Insights" card.
+    return summary.summary ?? ""
+}
+
 // --- Multiline skeleton shimmer for summary loading ---
 struct MultilineShimmerView: View {
     let lineCount: Int
@@ -84,12 +137,40 @@ struct ShimmerEffect: ViewModifier {
 class TextGenerationViewModel: ObservableObject {
     @Published var input: String = ""
     @Published var output: String = ""
+    @Published var isStreaming: Bool = false
+    @Published var primaryTipTitle: String = ""
+    @Published var primaryTipBody: String = ""
+    @Published var sessionInsights: String = ""
     private var session: LanguageModelSession?
+    private var streamingTask: Task<Void, Never>?
+    private let mode: TextGenerationMode
 
-    init() {
+    init(mode: TextGenerationMode = .dailySummary) {
+        self.mode = mode
         Task {
             do {
-                session = try await LanguageModelSession()
+                switch mode {
+                case .dailySummary:
+                    session = try await LanguageModelSession {
+                        """
+                        You are a helpful sunlight and vitamin D assistant. Using the stats provided in the prompt, generate:
+                        1) A 2–3 sentence overview of the user's current situation.
+                        2) Two short, concrete tips focused on safe sun exposure and vitamin D optimisation for the rest of the day.
+                        
+                        Do not ask the user questions, do not mention specific times like “morning sun”, and avoid repeating the same advice across calls. Keep the tone friendly, concise, and specific to the numbers you are given.
+                        """
+                    }
+                case .sessionAnalysis:
+                    session = try await LanguageModelSession {
+                        """
+                        You are a helpful vitamin D session analyst. Using the stats for a single past session, generate:
+                        1) A 2–3 sentence summary of the session's effectiveness.
+                        2) A short section of additional insights or patterns you notice.
+                        
+                        Do not provide tips or future recommendations; just describe and interpret what happened in this session in clear, friendly language.
+                        """
+                    }
+                }
             } catch {
                 print("Failed to create LanguageModelSession: \(error)")
             }
@@ -97,13 +178,57 @@ class TextGenerationViewModel: ObservableObject {
     }
 
     func generateText() {
-        Task {
+        // Cancel any in-flight streaming task
+        streamingTask?.cancel()
+        output = ""
+        primaryTipTitle = ""
+        primaryTipBody = ""
+        sessionInsights = ""
+
+        streamingTask = Task {
             guard let session else { return }
+            await MainActor.run {
+                self.isStreaming = true
+            }
+
             do {
-                let result = try await session.respond(to: input)
-                output = result.content
+                switch mode {
+                case .dailySummary:
+                    let stream = session.streamResponse(to: input, generating: DailySummary.self)
+                    for try await snapshot in stream {
+                        let rendered = renderDailySummary(from: snapshot.content)
+                        await MainActor.run {
+                            self.output = rendered
+                            if let tip = snapshot.content.tips?.first {
+                                self.primaryTipTitle = tip.title ?? ""
+                                self.primaryTipBody = tip.body ?? ""
+                            }
+                        }
+                    }
+                case .sessionAnalysis:
+                    let stream = session.streamResponse(to: input, generating: SessionSummary.self)
+                    for try await snapshot in stream {
+                        let rendered = renderSessionSummary(from: snapshot.content)
+                        await MainActor.run {
+                            self.output = rendered
+                            if let insights = snapshot.content.insights {
+                                self.sessionInsights = insights
+                            }
+                        }
+                    }
+                }
             } catch {
-                output = "Error: \(error.localizedDescription)"
+                if Task.isCancelled {
+                    // Swallow cancellation errors
+                } else {
+                    await MainActor.run {
+                        self.output = "Error: \(error.localizedDescription)"
+                    }
+                }
+            }
+
+            await MainActor.run {
+                self.isStreaming = false
             }
         }
     }
@@ -142,7 +267,6 @@ struct ContentView: View {
     @State private var lastUVUpdate: Date = UserDefaults.standard.object(forKey: "lastUVUpdate") as? Date ?? Date()
     @State private var timerCancellable: AnyCancellable?
     @StateObject private var summaryViewModel = TextGenerationViewModel()
-    @State private var isGenerating = false
     @State private var selectedSession: VitaminDSession? = nil
     
     private let timer = Timer.publish(every: 60, on: .main, in: .common)
@@ -203,17 +327,8 @@ struct ContentView: View {
                                         .padding(.bottom, 2)
                                     // HIDE PROMPT: Do not show TextEditor
                                     Button(action: {
-                                        isGenerating = true
                                         summaryViewModel.input = """
-Always generate your response in the following format:
-
-**Sunshine and Vitamin D Overview:** [Write a 2-3 sentence summary of the user's current sunlight and vitamin D stats, referencing their UV index, vitamin D rate, clothing, skin type, and total vitamin D.]
-
-Tips for Today:
-1. **[Short, bolded title for the tip]:** [1-2 sentences of actionable advice, referencing the user's actual stats.]
-2. **[Short, bolded title for the tip]:** [1-2 sentences of actionable advice, referencing the user's actual stats.]
-
-Do NOT include tips about morning sun exposure, as the user may use this at any time of day. Focus your tips on safe sun exposure and vitamin D optimization for the rest of the day, regardless of the current time. Do not repeat the same content each time—make the advice specific to the current stats.
+User stats for a personalised sunlight and vitamin D summary:
 
 - UV Index: \(String(format: "%.1f", uvService.currentUV))
 - Burn Limit: \(uvService.currentUV == 0 ? "---" : formatSafeTime(safeExposureTime))
@@ -233,11 +348,11 @@ Do NOT include tips about morning sun exposure, as the user may use this at any 
                                         summaryViewModel.generateText()
                                     }) {
                                         HStack(spacing: 8) {
-                                            if isGenerating {
+                                            if summaryViewModel.isStreaming {
                                                 ProgressView()
                                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                             }
-                                            Text(isGenerating ? "Analyzing..." : "Generate Analysis")
+                                            Text(summaryViewModel.isStreaming ? "Analyzing..." : "Generate Analysis")
                                                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                                                 .padding(.vertical, 2)
                                         }
@@ -245,31 +360,72 @@ Do NOT include tips about morning sun exposure, as the user may use this at any 
                                         .padding(.vertical, 16)
                                     }
                                     .buttonStyle(.glass)
-                                    .disabled(isGenerating)
+                                    .disabled(summaryViewModel.isStreaming)
                                     .padding(.top, 2)
                                     Group {
-                                        if isGenerating {
+                                        if summaryViewModel.output.isEmpty {
+                                            // While waiting for the first tokens, show skeleton
+                                            if summaryViewModel.isStreaming {
+                                                MultilineShimmerView(lineCount: 3, lineHeight: 16, spacing: 12)
+                                                    .frame(height: 60)
+                                                    .padding(.top, 4)
+                                            }
+                                        } else {
                                             MultilineShimmerView(lineCount: 3, lineHeight: 16, spacing: 12)
-                                                .frame(height: 60)
-                                                .padding(.top, 4)
-                                        } else if !summaryViewModel.output.isEmpty {
+                                                .opacity(0) // keep layout height stable when showing text
+                                                .frame(height: 0)
+                                            
                                             VStack(spacing: 8) {
                                                 HStack(spacing: 6) {
                                                     Image(systemName: "apple.intelligence")
                                                         .font(.system(size: 22, weight: .semibold))
                                                         .foregroundColor(.white)
-                                                    Text("AI-generated summary")
+                                                    Text(summaryViewModel.isStreaming ? "AI-generated summary (updating…)" : "AI-generated summary")
                                                         .font(.caption)
                                                         .foregroundColor(.white.opacity(0.7))
                                                 }
                                                 .frame(maxWidth: .infinity)
-                                                Text(.init(summaryViewModel.output))
-                                                    .padding()
-                                                    .background(Color.white.opacity(0.10))
-                                                    .cornerRadius(12)
-                                                    .foregroundColor(.white)
-                                                    .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
-                                                    .transition(.opacity)
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    Text(.init(summaryViewModel.output))
+                                                        .multilineTextAlignment(.leading)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                }
+                                                .padding()
+                                                .background(Color.white.opacity(0.10))
+                                                .cornerRadius(12)
+                                                .foregroundColor(.white)
+                                                .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                                                .transition(.opacity)
+                                            }
+                                            
+                                            // Tip of the Day card
+                                            if !summaryViewModel.primaryTipTitle.isEmpty {
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    HStack(spacing: 8) {
+                                                        Image(systemName: "lightbulb.max")
+                                                            .font(.system(size: 18, weight: .semibold))
+                                                            .foregroundColor(.yellow)
+                                                        Text("Tip of the Day")
+                                                            .font(.subheadline.weight(.semibold))
+                                                            .foregroundColor(.white)
+                                                    }
+                                                    if !summaryViewModel.primaryTipTitle.isEmpty {
+                                                        Text(summaryViewModel.primaryTipTitle)
+                                                            .font(.headline)
+                                                            .foregroundColor(.white)
+                                                    }
+                                            if !summaryViewModel.primaryTipBody.isEmpty {
+                                                Text(summaryViewModel.primaryTipBody)
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.white.opacity(0.85))
+                                            }
+                                                }
+                                                .padding()
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .background(Color.white.opacity(0.12))
+                                                .cornerRadius(14)
+                                                .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 3)
+                                                .transition(.opacity.combined(with: .move(edge: .bottom)))
                                             }
                                         }
                                     }
@@ -278,11 +434,6 @@ Do NOT include tips about morning sun exposure, as the user may use this at any 
                                 .background(Color.black.opacity(0.25))
                                 .cornerRadius(18)
                                 .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
-                                .onChange(of: summaryViewModel.output) { _, newValue in
-                                    if isGenerating && !newValue.isEmpty {
-                                        isGenerating = false
-                                    }
-                                }
                             } else {
                                 VStack(alignment: .leading, spacing: 10) {
                                     Text("Summary")

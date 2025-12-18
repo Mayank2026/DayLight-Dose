@@ -224,8 +224,12 @@ struct SessionsView: View {
 @available(iOS 26, *)
 struct AnalyzeSessionView: View {
     let session: VitaminDSession
-    @StateObject private var viewModel = TextGenerationViewModel()
-    @State private var isGenerating = false
+    @StateObject private var viewModel: TextGenerationViewModel
+    
+    init(session: VitaminDSession) {
+        self.session = session
+        _viewModel = StateObject(wrappedValue: TextGenerationViewModel(mode: .sessionAnalysis))
+    }
 
     var body: some View {
         ScrollView {
@@ -308,15 +312,14 @@ struct AnalyzeSessionView: View {
 
                 // Analysis button (not inside a card)
                 Button(action: {
-                    isGenerating = true
                     viewModel.generateText()
                 }) {
                     HStack(spacing: 8) {
-                        if isGenerating {
+                        if viewModel.isStreaming {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         }
-                        Text(isGenerating ? "Analyzing..." : "Generate Analysis")
+                        Text(viewModel.isStreaming ? "Analyzing..." : "Generate Analysis")
                             .font(.system(size: 18, weight: .semibold, design: .rounded))
                             .padding(.vertical, 2)
                     }
@@ -324,42 +327,71 @@ struct AnalyzeSessionView: View {
                     .padding(.vertical, 16)
                 }
                 .buttonStyle(.glass)
-                .disabled(isGenerating)
+                .disabled(viewModel.isStreaming)
                 .padding(.horizontal, 8)
 
                 // Analysis output or shimmer
                 Group {
-                    if isGenerating {
-                        VStack(spacing: 12) {
-                            ForEach(0..<3, id: \.self) { index in
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.white.opacity(0.13))
-                                    .frame(height: 16)
-                                    .shimmering()
+                    if viewModel.output.isEmpty {
+                        if viewModel.isStreaming {
+                            VStack(spacing: 12) {
+                                ForEach(0..<3, id: \.self) { index in
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.white.opacity(0.13))
+                                        .frame(height: 16)
+                                        .shimmering()
+                                }
                             }
+                            .frame(height: 60)
+                            .padding(.top, 4)
                         }
-                        .frame(height: 60)
-                        .padding(.top, 4)
-                    } else if !viewModel.output.isEmpty {
+                    } else {
                         VStack(spacing: 8) {
                             HStack(spacing: 6) {
                                 Image(systemName: "apple.intelligence")
                                     .font(.system(size: 22, weight: .semibold))
                                     .foregroundColor(.white)
-                                Text("AI-generated analysis")
+                                Text(viewModel.isStreaming ? "AI-generated analysis (updating…)" : "AI-generated analysis")
                                     .font(.caption)
                                     .foregroundColor(.white.opacity(0.7))
                             }
                             .frame(maxWidth: .infinity)
-                            Text(viewModel.output)
-                                .padding()
-                                .background(Color.white.opacity(0.10))
-                                .cornerRadius(12)
-                                .foregroundColor(.white)
-                                .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
-                                .transition(.opacity)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(.init(viewModel.output))
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding()
+                            .background(Color.white.opacity(0.10))
+                            .cornerRadius(12)
+                            .foregroundColor(.white)
+                            .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                            .transition(.opacity)
                         }
                         .padding(.horizontal, 8)
+
+                        // Session Insights card
+                        if !viewModel.sessionInsights.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.yellow)
+                                    Text("Session Insights")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(.white)
+                                }
+                                Text(viewModel.sessionInsights)
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.85))
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.12))
+                            .cornerRadius(14)
+                            .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 3)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
                 }
 
@@ -371,7 +403,7 @@ struct AnalyzeSessionView: View {
         .background(Color.black.opacity(0.18).ignoresSafeArea())
         .onAppear {
             viewModel.input = """
-Summarize this vitamin D session for the user in 2-3 sentences, using clear and friendly language. Use the date in the format '18 July 2025' (day month year, no time). Focus on summarizing the vitamin D absorption and providing other useful insights about the session, such as how effective the session was, how the user's stats (UV, clothing, skin type, age, etc.) contributed to the result, and any notable patterns. Do NOT generate tips or advice—just provide a summary and insights.
+Vitamin D session context for analysis (no advice, only description and insights):
 
 - Date: \(formatDayMonthYear(session.startTime))
 - Duration: \(session.durationString)
@@ -382,11 +414,6 @@ Summarize this vitamin D session for the user in 2-3 sentences, using clear and 
 - Skin Type: \(session.skinTypeDescription)
 - Age: \(session.userAge)
 """
-        }
-        .onChange(of: viewModel.output) { _, newValue in
-            if isGenerating && !newValue.isEmpty {
-                isGenerating = false
-            }
         }
     }
 }
