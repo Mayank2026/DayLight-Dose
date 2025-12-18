@@ -12,6 +12,7 @@ import UserNotifications
 import WidgetKit
 import UIKit
 import SwiftData
+import OSLog
 
 enum ClothingLevel: Int, CaseIterable {
     case none = -1
@@ -37,6 +38,37 @@ enum ClothingLevel: Int, CaseIterable {
         case .light: return 0.40
         case .moderate: return 0.15
         case .heavy: return 0.05
+        }
+    }
+}
+
+enum SunscreenLevel: Int, CaseIterable {
+    case none = 0
+    case spf15 = 15
+    case spf30 = 30
+    case spf50 = 50
+    case spf100 = 100
+    
+    var description: String {
+        switch self {
+        case .none: return "No sunscreen"
+        case .spf15: return "SPF 15"
+        case .spf30: return "SPF 30"
+        case .spf50: return "SPF 50"
+        case .spf100: return "SPF 100+"
+        }
+    }
+    
+    /// Fraction of UV that still reaches the skin.
+    /// Values are approximate but aligned with Sunday:
+    /// SPF 15 → ~7% UV, SPF 30 → ~3%, SPF 50 → ~2%, SPF 100+ → ~1%.
+    var uvTransmissionFactor: Double {
+        switch self {
+        case .none: return 1.0
+        case .spf15: return 0.07
+        case .spf30: return 0.03
+        case .spf50: return 0.02
+        case .spf100: return 0.01
         }
     }
 }
@@ -79,6 +111,11 @@ class VitaminDCalculator: ObservableObject {
             UserDefaults.standard.set(clothingLevel.rawValue, forKey: "preferredClothingLevel")
         }
     }
+    @Published var sunscreenLevel: SunscreenLevel = .none {
+        didSet {
+            UserDefaults.standard.set(sunscreenLevel.rawValue, forKey: "preferredSunscreenLevel")
+        }
+    }
     @Published var skinType: SkinType = .type3 {
         didSet {
             UserDefaults.standard.set(skinType.rawValue, forKey: "userSkinType")
@@ -98,6 +135,11 @@ class VitaminDCalculator: ObservableObject {
             UserDefaults.standard.set(userAge, forKey: "userAge")
         }
     }
+    @Published var useAgeFactor: Bool = true {
+        didSet {
+            UserDefaults.standard.set(useAgeFactor, forKey: "useAgeFactor")
+        }
+    }
     @Published var ageFromHealth = false
     @Published var currentUVQualityFactor: Double = 1.0
     @Published var currentAdaptationFactor: Double = 1.0
@@ -109,11 +151,21 @@ class VitaminDCalculator: ObservableObject {
     private weak var uvService: UVService?
     private var healthKitSkinType: SkinType?
     private var lastUpdateTime: Date?
-    private let sharedDefaults = UserDefaults(suiteName: "group.sunday.widget")
+    private let sharedDefaults = UserDefaults(suiteName: "group.daylight.mayank")
     private var appActiveObserver: NSObjectProtocol?
     private var appBackgroundObserver: NSObjectProtocol?
     private var wasTrackingBeforeBackground = false
     private var modelContext: ModelContext?
+    private var lastWidgetUpdateTime: Date?
+    private let widgetUpdateThrottle: TimeInterval = 60.0
+    private var todaysHealthBase: Double = 0.0
+    private var lastHealthBaseRefreshTime: Date?
+    private let healthBaseRefreshInterval: TimeInterval = 900.0 // 15 minutes
+    #if DEBUG
+    private static let logger = Logger(subsystem: "com.mayank.daylightdose", category: "VitaminDCalculator")
+    private let signposter = OSSignposter(subsystem: "com.mayank.daylightdose", category: "VitaminDCalculator")
+    private var sessionInterval: OSSignpostIntervalState?
+    #endif
     
     // UV response curve parameters
     private let uvHalfMax = 4.0  // UV index for 50% vitamin D synthesis rate (more linear)
@@ -142,6 +194,7 @@ class VitaminDCalculator: ObservableObject {
         checkHealthKitSkinType()
         checkHealthKitAge()
         updateAdaptationFactor()
+        refreshTodaysHealthBase(force: true)
     }
     
     func setUVService(_ uvService: UVService) {
@@ -159,6 +212,11 @@ class VitaminDCalculator: ObservableObject {
             clothingLevel = clothing
         }
         
+        if let savedSunscreenLevel = UserDefaults.standard.object(forKey: "preferredSunscreenLevel") as? Int,
+           let sunscreen = SunscreenLevel(rawValue: savedSunscreenLevel) {
+            sunscreenLevel = sunscreen
+        }
+        
         if let savedSkinType = UserDefaults.standard.object(forKey: "userSkinType") as? Int,
            let skin = SkinType(rawValue: savedSkinType) {
             skinType = skin
@@ -166,6 +224,10 @@ class VitaminDCalculator: ObservableObject {
         
         if let savedAge = UserDefaults.standard.object(forKey: "userAge") as? Int {
             userAge = savedAge
+        }
+        
+        if let savedUseAge = UserDefaults.standard.object(forKey: "useAgeFactor") as? Bool {
+            useAgeFactor = savedUseAge
         }
     }
     
@@ -224,6 +286,12 @@ class VitaminDCalculator: ObservableObject {
             self.updateMEDExposure(uvIndex: currentUV)
         }
         
+        #if DEBUG
+        let state = signposter.beginInterval("Session")
+        sessionInterval = state
+        Self.logger.debug("Session start uv=\(uvIndex, privacy: .public)")
+        #endif
+        
         updateVitaminDRate(uvIndex: uvIndex)
     }
     
@@ -265,7 +333,15 @@ class VitaminDCalculator: ObservableObject {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["burnWarning"])
         
         // Update widget data
-        updateWidgetData()
+        updateWidgetData(force: true)
+        
+        #if DEBUG
+        if let state = sessionInterval {
+            signposter.endInterval("Session", state)
+            sessionInterval = nil
+        }
+        Self.logger.debug("Session stop totalIU=\(self.sessionVitaminD, privacy: .public)")
+        #endif
     }
     
     func updateUV(_ uvIndex: Double) {
@@ -280,10 +356,14 @@ class VitaminDCalculator: ObservableObject {
         // Full body exposure can reach 30,000-40,000 IU/hr in optimal conditions
         let baseRate = 21000.0
         
+        // Apply sunscreen transmission before feeding UV into the response curve.
+        // This effectively scales down vitamin D production when sunscreen is used.
+        let effectiveUV = max(0, uvIndex * sunscreenLevel.uvTransmissionFactor)
+        
         // UV factor: Michaelis-Menten-like saturation curve
         // More accurate representation of vitamin D synthesis kinetics
         // UV 0 = 0x, UV 3 = 1.25x (50% of max), UV 12 = 2x, UV∞ → 2.5x
-        let uvFactor = (uvIndex * uvMaxFactor) / (uvHalfMax + uvIndex)
+        let uvFactor = (effectiveUV * uvMaxFactor) / (uvHalfMax + effectiveUV)
         
         // Exposure based on clothing coverage
         let exposureFactor = clothingLevel.exposureFactor
@@ -294,13 +374,17 @@ class VitaminDCalculator: ObservableObject {
         // Age factor: vitamin D synthesis decreases with age
         // ~25% synthesis at age 70 compared to age 20
         let ageFactor: Double
-        if userAge <= 20 {
-            ageFactor = 1.0
-        } else if userAge >= 70 {
-            ageFactor = 0.25
+        if useAgeFactor {
+            if userAge <= 20 {
+                ageFactor = 1.0
+            } else if userAge >= 70 {
+                ageFactor = 0.25
+            } else {
+                // Linear decrease: lose ~1% per year after age 20
+                ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+            }
         } else {
-            // Linear decrease: lose ~1% per year after age 20
-            ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+            ageFactor = 1.0
         }
         
         // Calculate UV quality factor based on time of day
@@ -331,8 +415,57 @@ class VitaminDCalculator: ObservableObject {
         updateWidgetData()
     }
     
+    /// Standalone vitamin D calculation for a given UV, duration, and exposure factors.
+    /// Used for manual session logging so it stays consistent with the live model.
+    func calculateVitaminD(uvIndex: Double,
+                           exposureMinutes: Double,
+                           skinType: SkinType,
+                           clothingLevel: ClothingLevel,
+                           sunscreenLevel: SunscreenLevel = .none) -> Double {
+        // Base rate: 21000 IU/hr for Type 3 skin with minimal clothing (80% exposure)
+        let baseRate = 21000.0
+        
+        // Apply sunscreen transmission
+        let effectiveUV = max(0, uvIndex * sunscreenLevel.uvTransmissionFactor)
+        
+        // UV factor: same saturation curve as live tracking
+        let uvFactor = (effectiveUV * uvMaxFactor) / (uvHalfMax + effectiveUV)
+        
+        // Exposure based on clothing coverage
+        let exposureFactor = clothingLevel.exposureFactor
+        
+        // Skin type affects vitamin D synthesis efficiency
+        let skinFactor = skinType.vitaminDFactor
+        
+        // Age factor: reuse the same logic as for live rate
+        let ageFactor: Double
+        if useAgeFactor {
+            if userAge <= 20 {
+                ageFactor = 1.0
+            } else if userAge >= 70 {
+                ageFactor = 0.25
+            } else {
+                ageFactor = max(0.25, 1.0 - Double(userAge - 20) * 0.01)
+            }
+        } else {
+            ageFactor = 1.0
+        }
+        
+        // Use current adaptation factor (falls back to 1.0 by default)
+        let adaptationFactor = currentAdaptationFactor
+        
+        // Hourly rate with all factors applied
+        let hourlyRate = baseRate * uvFactor * exposureFactor * skinFactor * ageFactor * adaptationFactor
+        
+        // Convert to amount for the requested minutes
+        return hourlyRate * (exposureMinutes / 60.0)
+    }
+    
     func toggleSunExposure(uvIndex: Double) {
         isInSun.toggle()
+        #if DEBUG
+        Self.logger.debug("Toggle exposure isInSun=\(self.isInSun, privacy: .public) uv=\(uvIndex, privacy: .public)")
+        #endif
         
         if isInSun {
             startSession(uvIndex: uvIndex)
@@ -403,7 +536,9 @@ class VitaminDCalculator: ObservableObject {
     }
     
     private func updateMEDExposure(uvIndex: Double) {
-        guard isInSun, uvIndex > 0 else { return }
+        // Use effective UV after sunscreen for burn estimation too.
+        let effectiveUV = uvIndex * sunscreenLevel.uvTransmissionFactor
+        guard isInSun, effectiveUV > 0 else { return }
         
         // MED values at UV 1 (must match UVService values)
         let medTimesAtUV1: [Int: Double] = [
@@ -417,8 +552,8 @@ class VitaminDCalculator: ObservableObject {
         
         guard let medTimeAtUV1 = medTimesAtUV1[skinType.rawValue] else { return }
         
-        // Calculate MED per second at current UV
-        let medMinutesAtCurrentUV = medTimeAtUV1 / uvIndex
+        // Calculate MED per second at current (effective) UV
+        let medMinutesAtCurrentUV = medTimeAtUV1 / effectiveUV
         let medFractionPerSecond = 1.0 / (medMinutesAtCurrentUV * 60.0)
         
         // Accumulate MED exposure
@@ -501,24 +636,61 @@ class VitaminDCalculator: ObservableObject {
         }
     }
     
-    private func updateWidgetData() {
+    private func updateWidgetData(force: Bool = false) {
         guard let uvService = uvService else { return }
         
+        let now = Date()
+        if !force, let last = lastWidgetUpdateTime, now.timeIntervalSince(last) < widgetUpdateThrottle {
+            return
+        }
+        lastWidgetUpdateTime = now
+        
+        // Always keep core fields fresh
         sharedDefaults?.set(uvService.currentUV, forKey: "currentUV")
         sharedDefaults?.set(isInSun, forKey: "isTracking")
         sharedDefaults?.set(currentVitaminDRate, forKey: "vitaminDRate")
         
-        // Calculate today's total including current session
+        // Refresh today's Health base occasionally, then add live session on top
+        let shouldRefreshBase: Bool
+        if force || lastHealthBaseRefreshTime == nil {
+            shouldRefreshBase = true
+        } else if let last = lastHealthBaseRefreshTime {
+            shouldRefreshBase = now.timeIntervalSince(last) >= healthBaseRefreshInterval
+        } else {
+            shouldRefreshBase = true
+        }
+        
+        if shouldRefreshBase {
+            refreshTodaysHealthBase(force: force)
+        } else {
+            // Use cached base + live session
+            let todaysTotal = todaysHealthBase + sessionVitaminD
+            sharedDefaults?.set(todaysTotal, forKey: "todaysTotal")
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+    
+    private func refreshTodaysHealthBase(force: Bool) {
+        guard let healthManager = healthManager else {
+            // No Health manager; just treat base as zero
+            todaysHealthBase = 0
+            let total = todaysHealthBase + sessionVitaminD
+            sharedDefaults?.set(total, forKey: "todaysTotal")
+            WidgetCenter.shared.reloadAllTimelines()
+            return
+        }
+        
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
         
-        healthManager?.readVitaminDIntake(from: startOfDay, to: endOfDay) { [weak self] total, error in
+        healthManager.readVitaminDIntake(from: startOfDay, to: endOfDay) { [weak self] total, _ in
             guard let self = self else { return }
-            let todaysTotal = total + self.sessionVitaminD
+            let base = total
+            self.todaysHealthBase = base
+            self.lastHealthBaseRefreshTime = Date()
+            let todaysTotal = base + self.sessionVitaminD
             self.sharedDefaults?.set(todaysTotal, forKey: "todaysTotal")
-            
-            // Trigger widget update
             WidgetCenter.shared.reloadAllTimelines()
         }
     }

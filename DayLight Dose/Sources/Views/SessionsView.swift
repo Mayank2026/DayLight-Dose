@@ -14,6 +14,8 @@ struct SessionsView: View {
     
     @State private var currentGradientColors: [Color] = []
     @State private var showStats = false
+    @State private var selectedSession: VitaminDSession? = nil
+    // Removed: @State private var showAnalyzeSheet = false
     
     var body: some View {
         ZStack {
@@ -125,6 +127,9 @@ struct SessionsView: View {
             LazyVStack(spacing: 16) {
                 ForEach(sessions) { session in
                     SessionCard(session: session)
+                        .onTapGesture {
+                            selectedSession = session
+                        }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 deleteSession(session)
@@ -136,6 +141,11 @@ struct SessionsView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
+        }
+        .sheet(item: $selectedSession) { session in
+            AnalyzeSessionView(session: session)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -211,6 +221,203 @@ struct SessionsView: View {
     }
 }
 
+@available(iOS 26, *)
+struct AnalyzeSessionView: View {
+    let session: VitaminDSession
+    @StateObject private var viewModel: TextGenerationViewModel
+    
+    init(session: VitaminDSession) {
+        self.session = session
+        _viewModel = StateObject(wrappedValue: TextGenerationViewModel(mode: .sessionAnalysis))
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 28) { // Reduced spacing between title and card
+                // Title above the card
+                Text("Session Details")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.top, 32)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                // Session details card
+                VStack(alignment: .leading, spacing: 12) {
+                    // Header with date and time
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(formatDate(session.startTime))
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                            // No time range in analysis card
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text(formatVitaminD(session.totalIU))
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.white)
+                            Text("IU")
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+                    // Session details
+                    HStack(spacing: 20) {
+                        DetailItem(
+                            icon: "clock",
+                            title: "Duration",
+                            value: session.durationString
+                        )
+                        DetailItem(
+                            icon: "sun.max",
+                            title: "UV Index",
+                            value: String(format: "%.1f", session.averageUV)
+                        )
+                        DetailItem(
+                            icon: "person",
+                            title: "Skin Type",
+                            value: session.skinTypeDescription
+                        )
+                    }
+                    // Clothing level and extra info
+                    HStack {
+                        Image(systemName: "tshirt")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("Clothing: \(session.clothingLevelDescription)")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.8))
+                        Spacer()
+                    }
+                    // Add peak UV and age row for extra info
+                    HStack(spacing: 20) {
+                        DetailItem(
+                            icon: "flame",
+                            title: "Peak UV",
+                            value: String(format: "%.1f", session.peakUV)
+                        )
+                        DetailItem(
+                            icon: "figure.walk",
+                            title: "Age",
+                            value: String(session.userAge)
+                        )
+                    }
+                }
+                .padding(16)
+                .background(Color.black.opacity(0.2))
+                .cornerRadius(16)
+                .frame(maxWidth: 500)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 16)
+
+                // Analysis button (not inside a card)
+                Button(action: {
+                    viewModel.generateText()
+                }) {
+                    HStack(spacing: 8) {
+                        if viewModel.isStreaming {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        }
+                        Text(viewModel.isStreaming ? "Analyzing..." : "Generate Analysis")
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                            .padding(.vertical, 2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                }
+                .buttonStyle(.glass)
+                .disabled(viewModel.isStreaming)
+                .padding(.horizontal, 8)
+
+                // Analysis output or shimmer
+                Group {
+                    if viewModel.output.isEmpty {
+                        if viewModel.isStreaming {
+                            VStack(spacing: 12) {
+                                ForEach(0..<3, id: \.self) { index in
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.white.opacity(0.13))
+                                        .frame(height: 16)
+                                        .shimmering()
+                                }
+                            }
+                            .frame(height: 60)
+                            .padding(.top, 4)
+                        }
+                    } else {
+                        VStack(spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "apple.intelligence")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundColor(.white)
+                                Text(viewModel.isStreaming ? "AI-generated analysis (updating…)" : "AI-generated analysis")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(.init(viewModel.output))
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding()
+                            .background(Color.white.opacity(0.10))
+                            .cornerRadius(12)
+                            .foregroundColor(.white)
+                            .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                            .transition(.opacity)
+                        }
+                        .padding(.horizontal, 8)
+
+                        // Session Insights card
+                        if !viewModel.sessionInsights.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.yellow)
+                                    Text("Session Insights")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(.white)
+                                }
+                                Text(viewModel.sessionInsights)
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.85))
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.12))
+                            .cornerRadius(14)
+                            .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 3)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
+                    }
+                }
+
+                Spacer(minLength: 24)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
+        }
+        .background(Color.black.opacity(0.18).ignoresSafeArea())
+        .onAppear {
+            viewModel.input = """
+Vitamin D session context for analysis (no advice, only description and insights):
+
+- Date: \(formatDayMonthYear(session.startTime))
+- Duration: \(session.durationString)
+- Total Vitamin D: \(Int(session.totalIU)) IU
+- Average UV: \(String(format: "%.1f", session.averageUV))
+- Peak UV: \(String(format: "%.1f", session.peakUV))
+- Clothing: \(session.clothingLevelDescription)
+- Skin Type: \(session.skinTypeDescription)
+- Age: \(session.userAge)
+"""
+        }
+    }
+}
+
 struct SessionCard: View {
     let session: VitaminDSession
     
@@ -279,33 +486,39 @@ struct SessionCard: View {
         .background(Color.black.opacity(0.2))
         .cornerRadius(16)
     }
-    
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+}
+
+fileprivate func formatDate(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .none
+    return formatter.string(from: date)
+}
+
+fileprivate func formatTime(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .none
+    formatter.timeStyle = .short
+    return formatter.string(from: date)
+}
+
+fileprivate func formatVitaminD(_ value: Double) -> String {
+    if value < 1000 {
+        return "\(Int(value))"
+    } else if value < 10000 {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "\(Int(value))"
+    } else {
+        return String(format: "%.0fK", value / 1000)
     }
-    
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
-    }
-    
-    private func formatVitaminD(_ value: Double) -> String {
-        if value < 1000 {
-            return "\(Int(value))"
-        } else if value < 10000 {
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.maximumFractionDigits = 0
-            return formatter.string(from: NSNumber(value: value)) ?? "\(Int(value))"
-        } else {
-            return String(format: "%.0fK", value / 1000)
-        }
-    }
+}
+
+fileprivate func formatDayMonthYear(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "d MMMM yyyy"
+    return formatter.string(from: date)
 }
 
 struct DetailItem: View {
@@ -363,3 +576,4 @@ struct StatCard: View {
     SessionsView()
         .modelContainer(for: VitaminDSession.self, inMemory: true)
 } 
+

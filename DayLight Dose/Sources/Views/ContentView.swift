@@ -5,13 +5,250 @@
 //  Created by Mayank Verma on 15/07/25.
 //
 
-import SwiftUI
 import CoreLocation
 import UIKit
 import SwiftData
 import WidgetKit
 import Combine
+import Foundation
+import FoundationModels
+import SwiftUI
 
+// --- Guided generation models for AI summaries ---
+@Generable
+struct DailySummary {
+    @Guide(description: "A 2–3 sentence overview of the user's current sunlight and vitamin D status, explicitly referencing UV index, vitamin D rate, clothing, skin type, and today's total vitamin D.")
+    let overview: String
+    
+    @Guide(description: "Two concise, concrete tips tailored to the user's stats. Focus on safe sun exposure and vitamin D optimisation for the rest of the day, without assuming time of day and without repeating generic advice.")
+    let tips: [DailyTip]
+}
+
+@Generable
+struct DailyTip {
+    @Guide(description: "A short, punchy title for the tip, like 'Adjust Midday Exposure' or 'Balance Supplements and Sun'. Do NOT include markdown characters such as ** or bullet markers.")
+    let title: String
+    
+    @Guide(description: "1–2 sentences of actionable advice based on the user's actual stats.")
+    let body: String
+}
+
+@Generable
+struct SessionSummary {
+    @Guide(description: "A 2–3 sentence friendly summary of this single vitamin D session, describing vitamin D absorption, how effective the session was, and how UV, clothing, skin type, and age contributed.")
+    let summary: String
+    
+    @Guide(description: "1–3 concise insights or notable patterns about this session (for example, efficiency, timing, or intensity), without giving prescriptive tips or advice.")
+    let insights: String
+}
+
+// MARK: - Guided-generation helpers
+
+enum TextGenerationMode {
+    case dailySummary
+    case sessionAnalysis
+}
+
+// The streaming API yields `DailySummary.PartiallyGenerated`, so we accept that here
+private func renderDailySummary(from summary: DailySummary.PartiallyGenerated) -> String {
+    var sections: [String] = []
+    
+    if let overview = summary.overview {
+        sections.append("**Sunshine and Vitamin D Overview:** \(overview)")
+    }
+    
+    return sections.joined(separator: "\n\n")
+}
+
+// Likewise, the session analysis stream yields `SessionSummary.PartiallyGenerated`
+private func renderSessionSummary(from summary: SessionSummary.PartiallyGenerated) -> String {
+    // Only show the high-level session summary here.
+    // Detailed insights are surfaced separately in the dedicated "Session Insights" card.
+    return summary.summary ?? ""
+}
+
+// --- Multiline skeleton shimmer for summary loading ---
+struct MultilineShimmerView: View {
+    let lineCount: Int
+    let lineHeight: CGFloat
+    let spacing: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(0..<lineCount, id: \.self) { index in
+                RoundedRectangle(cornerRadius: lineHeight / 2)
+                    .fill(Color.white.opacity(0.13))
+                    .frame(
+                        width: index == lineCount - 1 && lineCount > 1
+                            ? CGFloat.random(in: 80...160)
+                            : CGFloat.random(in: 220...320),
+                        height: lineHeight
+                    )
+                    .shimmering() // <-- Move shimmer here!
+            }
+        }
+    }
+}
+
+extension View {
+    func shimmering() -> some View {
+        self.modifier(ShimmerEffect())
+    }
+}
+
+struct ShimmerEffect: ViewModifier {
+    @State private var phase: CGFloat = 0
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geometry in
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.0),
+                                    Color.white.opacity(0.25),
+                                    Color.white.opacity(0.0)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .rotationEffect(.degrees(15))
+                        .offset(x: phase * geometry.size.width * 2 - geometry.size.width)
+                        .animation(
+                            Animation.linear(duration: 1.2)
+                                .repeatForever(autoreverses: false),
+                            value: phase
+                        )
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped() // <-- Ensure shimmer overlay is clipped to bounds
+                }
+                .allowsHitTesting(false)
+            )
+            .onAppear {
+                phase = 1
+            }
+    }
+}
+
+@available(iOS 26, *)
+@MainActor
+class TextGenerationViewModel: ObservableObject {
+    @Published var input: String = ""
+    @Published var output: String = ""
+    @Published var isStreaming: Bool = false
+    @Published var primaryTipTitle: String = ""
+    @Published var primaryTipBody: String = ""
+    @Published var sessionInsights: String = ""
+    private var session: LanguageModelSession?
+    private var streamingTask: Task<Void, Never>?
+    private let mode: TextGenerationMode
+
+    init(mode: TextGenerationMode = .dailySummary) {
+        self.mode = mode
+        Task {
+            do {
+                switch mode {
+                case .dailySummary:
+                    session = try await LanguageModelSession {
+                        """
+                        You are a helpful sunlight and vitamin D assistant. Using the stats provided in the prompt, generate:
+                        1) A 2–3 sentence overview of the user's current situation.
+                        2) Two short, concrete tips focused on safe sun exposure and vitamin D optimisation for the rest of the day.
+                        
+                        Do not ask the user questions, do not mention specific times like “morning sun”, and avoid repeating the same advice across calls. Keep the tone friendly, concise, and specific to the numbers you are given.
+                        """
+                    }
+                case .sessionAnalysis:
+                    session = try await LanguageModelSession {
+                        """
+                        You are a helpful vitamin D session analyst. Using the stats for a single past session, generate:
+                        1) A 2–3 sentence summary of the session's effectiveness.
+                        2) A short section of additional insights or patterns you notice.
+                        
+                        Do not provide tips or future recommendations; just describe and interpret what happened in this session in clear, friendly language.
+                        """
+                    }
+                }
+            } catch {
+                print("Failed to create LanguageModelSession: \(error)")
+            }
+        }
+    }
+
+    func generateText() {
+        // Cancel any in-flight streaming task
+        streamingTask?.cancel()
+        output = ""
+        primaryTipTitle = ""
+        primaryTipBody = ""
+        sessionInsights = ""
+
+        streamingTask = Task {
+            guard let session else { return }
+            await MainActor.run {
+                self.isStreaming = true
+            }
+
+            do {
+                switch mode {
+                case .dailySummary:
+                    let stream = session.streamResponse(to: input, generating: DailySummary.self)
+                    for try await snapshot in stream {
+                        let rendered = renderDailySummary(from: snapshot.content)
+                        await MainActor.run {
+                            self.output = rendered
+                            if let tip = snapshot.content.tips?.first {
+                                self.primaryTipTitle = tip.title ?? ""
+                                self.primaryTipBody = tip.body ?? ""
+                            }
+                        }
+                    }
+                case .sessionAnalysis:
+                    let stream = session.streamResponse(to: input, generating: SessionSummary.self)
+                    for try await snapshot in stream {
+                        let rendered = renderSessionSummary(from: snapshot.content)
+                        await MainActor.run {
+                            self.output = rendered
+                            if let insights = snapshot.content.insights {
+                                self.sessionInsights = insights
+                            }
+                        }
+                    }
+                }
+            } catch {
+                if Task.isCancelled {
+                    // Swallow cancellation errors
+                } else {
+                    await MainActor.run {
+                        self.output = "Error: \(error.localizedDescription)"
+                    }
+                }
+            }
+
+            await MainActor.run {
+                self.isStreaming = false
+            }
+        }
+    }
+}
+
+// Fallback for earlier iOS versions
+struct ContentViewLegacy: View {
+    var body: some View {
+        VStack {
+            Text("This feature requires iOS 26 or newer.")
+                .font(.title2)
+                .foregroundColor(.secondary)
+                .padding()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+    }
+}
+
+@available(iOS 26, *)
 struct ContentView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var uvService: UVService
@@ -20,14 +257,22 @@ struct ContentView: View {
     @EnvironmentObject var networkMonitor: NetworkMonitor
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Query private var userPreferences: [UserPreferences]
     
     @State private var showClothingPicker = false
     @State private var showSkinTypePicker = false
+    @State private var showSunscreenPicker = false
+    @State private var showManualExposureSheet = false
+    @State private var showSessionCompletionSheet = false
+    @State private var pendingSessionStartTime: Date? = nil
+    @State private var pendingSessionAmount: Double = 0
     @State private var todaysTotal: Double = 0
     @State private var currentGradientColors: [Color] = []
     @State private var showInfoSheet = false
     @State private var lastUVUpdate: Date = UserDefaults.standard.object(forKey: "lastUVUpdate") as? Date ?? Date()
     @State private var timerCancellable: AnyCancellable?
+    @StateObject private var summaryViewModel = TextGenerationViewModel()
+    @State private var selectedSession: VitaminDSession? = nil
     
     private let timer = Timer.publish(every: 60, on: .main, in: .common)
     
@@ -78,11 +323,143 @@ struct ContentView: View {
                             exposureToggle
                             clothingSection
                             skinTypeSection
+                            MembersCardView()
+                            // --- Summary Section ---
+                            if #available(iOS 26, *) {
+                                VStack(alignment: .leading, spacing: 18) {
+                                    Text("Summary")
+                                        .font(.title3.bold())
+                                        .foregroundColor(.white)
+                                        .padding(.bottom, 2)
+                                    // HIDE PROMPT: Do not show TextEditor
+                                    Button(action: {
+                                        summaryViewModel.input = """
+User stats for a personalised sunlight and vitamin D summary:
+
+- UV Index: \(String(format: "%.1f", uvService.currentUV))
+- Burn Limit: \(uvService.currentUV == 0 ? "---" : formatSafeTime(safeExposureTime))
+- Max UVI: \(String(format: "%.1f", uvService.displayMaxUV))
+- Sunrise: \(formatTime(uvService.displaySunrise))
+- Sunset: \(formatTime(uvService.displaySunset))
+- Cloud Cover: \(Int(uvService.currentCloudCover))%
+- Altitude: \(Int(uvService.currentAltitude))m
+- Location: \(locationManager.locationName)
+- Vitamin D Rate: \(formatVitaminDNumber(vitaminDCalculator.currentVitaminDRate / 60.0)) IU/min
+- Session Vitamin D: \(formatVitaminDNumber(vitaminDCalculator.sessionVitaminD)) IU
+- Today's Total Vitamin D: \(formatTodaysTotal(todaysTotal + vitaminDCalculator.sessionVitaminD)) IU
+- Clothing: \(vitaminDCalculator.clothingLevel.description)
+- Skin Type: \(vitaminDCalculator.skinType.description)
+- Age: \(vitaminDCalculator.userAge)
+"""
+                                        summaryViewModel.generateText()
+                                    }) {
+                                        HStack(spacing: 8) {
+                                            if summaryViewModel.isStreaming {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            }
+                                            Text(summaryViewModel.isStreaming ? "Analyzing..." : "Generate Analysis")
+                                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                                .padding(.vertical, 2)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 16)
+                                    }
+                                    .buttonStyle(.glass)
+                                    .disabled(summaryViewModel.isStreaming)
+                                    .padding(.top, 2)
+                                    Group {
+                                        if summaryViewModel.output.isEmpty {
+                                            // While waiting for the first tokens, show skeleton
+                                            if summaryViewModel.isStreaming {
+                                                MultilineShimmerView(lineCount: 3, lineHeight: 16, spacing: 12)
+                                                    .frame(height: 60)
+                                                    .padding(.top, 4)
+                                            }
+                                        } else {
+                                            MultilineShimmerView(lineCount: 3, lineHeight: 16, spacing: 12)
+                                                .opacity(0) // keep layout height stable when showing text
+                                                .frame(height: 0)
+                                            
+                                            VStack(spacing: 8) {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "apple.intelligence")
+                                                        .font(.system(size: 22, weight: .semibold))
+                                                        .foregroundColor(.white)
+                                                    Text(summaryViewModel.isStreaming ? "AI-generated summary (updating…)" : "AI-generated summary")
+                                                        .font(.caption)
+                                                        .foregroundColor(.white.opacity(0.7))
+                                                }
+                                                .frame(maxWidth: .infinity)
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    Text(.init(summaryViewModel.output))
+                                                        .multilineTextAlignment(.leading)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                }
+                                                .padding()
+                                                .background(Color.white.opacity(0.10))
+                                                .cornerRadius(12)
+                                                .foregroundColor(.white)
+                                                .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                                                .transition(.opacity)
+                                            }
+                                            
+                                            // Tip of the Day card
+                                            if !summaryViewModel.primaryTipTitle.isEmpty {
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    HStack(spacing: 8) {
+                                                        Image(systemName: "lightbulb.max")
+                                                            .font(.system(size: 18, weight: .semibold))
+                                                            .foregroundColor(.yellow)
+                                                        Text("Tip of the Day")
+                                                            .font(.subheadline.weight(.semibold))
+                                                            .foregroundColor(.white)
+                                                    }
+                                                    if !summaryViewModel.primaryTipTitle.isEmpty {
+                                                        Text(summaryViewModel.primaryTipTitle)
+                                                            .font(.headline)
+                                                            .foregroundColor(.white)
+                                                    }
+                                            if !summaryViewModel.primaryTipBody.isEmpty {
+                                                Text(summaryViewModel.primaryTipBody)
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.white.opacity(0.85))
+                                            }
+                                                }
+                                                .padding()
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .background(Color.white.opacity(0.12))
+                                                .cornerRadius(14)
+                                                .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 3)
+                                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding()
+                                .background(Color.black.opacity(0.25))
+                                .cornerRadius(18)
+                                .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
+                            } else {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Summary")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Text("Summarization is only available on iOS 26 and newer.")
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .padding()
+                                        .background(Color.white.opacity(0.08))
+                                        .cornerRadius(8)
+                                }
+                                .padding()
+                                .background(Color.black.opacity(0.2))
+                                .cornerRadius(16)
+                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 20)
                         .padding(.bottom, uvService.isOfflineMode ? 40 : 0)
-                    .animation(.easeInOut(duration: 0.3), value: uvService.isOfflineMode)
+                        .animation(.easeInOut(duration: 0.3), value: uvService.isOfflineMode)
                         .frame(maxWidth: .infinity, minHeight: geometry.size.height)
                         .frame(width: geometry.size.width)
                     }
@@ -117,6 +494,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: uvService.isOfflineMode)
         .onAppear {
             setupApp()
+            syncPreferencesFromUser()
             // Start timer when view appears
             timerCancellable = timer.autoconnect().sink { _ in
                 updateData()
@@ -126,7 +504,16 @@ struct ContentView: View {
                 if newColors != currentGradientColors {
                     currentGradientColors = newColors
                 }
+                updateWidgetSharedData()
             }
+            updateWidgetSharedData()
+        }
+        .onChange(of: userPreferences.first) { _ in
+            syncPreferencesFromUser()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Reset one-time location alert flag when app becomes active
+            locationManager.resetLocationDeniedAlert()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Check for updated skin type and adaptation when app returns to foreground
@@ -161,27 +548,42 @@ struct ContentView: View {
         }
         .onChange(of: vitaminDCalculator.isInSun) {
             handleSunToggle()
+            updateWidgetSharedData()
         }
         .onChange(of: locationManager.location) { _, newLocation in
             if let location = newLocation {
                 uvService.fetchUVData(for: location)
+                updateWidgetSharedData()
             }
         }
         .onChange(of: vitaminDCalculator.clothingLevel) {
             // Update rate when clothing changes
             vitaminDCalculator.updateUV(uvService.currentUV)
+            updateWidgetSharedData()
         }
         .onChange(of: vitaminDCalculator.skinType) {
             // Update rate when skin type changes
             vitaminDCalculator.updateUV(uvService.currentUV)
+            updateWidgetSharedData()
         }
         .onChange(of: uvService.currentUV) { _, newUV in
             // Update rate when UV changes
             vitaminDCalculator.updateUV(newUV)
+            updateWidgetSharedData()
+        }
+        .onChange(of: todaysTotal) { _, _ in
+            updateWidgetSharedData()
         }
         .onOpenURL { url in
             handleURL(url)
         }
+        .alert("Location access needed",
+               isPresented: $locationManager.showLocationDeniedAlert,
+               actions: {
+                   Button("OK", role: .cancel) { }
+               }, message: {
+                   Text(locationManager.locationDeniedMessage)
+               })
     }
     
     private var backgroundGradient: some View {
@@ -248,14 +650,45 @@ struct ContentView: View {
     
     private var uvSection: some View {
         VStack(spacing: 8) {
-            Text("UV INDEX")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundColor(.white.opacity(0.7))
-                .tracking(1.5)
-            
-            Text(String(format: "%.1f", uvService.currentUV))
-                .font(.system(size: 72, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+            if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
+                VStack(spacing: 12) {
+                    Image(systemName: "location.slash")
+                        .font(.system(size: 40))
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    Text("LOCATION ACCESS REQUIRED")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                        .tracking(1.5)
+                    
+                    Text("Enable location to get accurate UV and vitamin D estimates.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                    
+                    Button(action: {
+                        locationManager.openSettings()
+                    }) {
+                        Text("Enable Location")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(20)
+                    }
+                }
+            } else {
+                Text("UV INDEX")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+                    .tracking(1.5)
+                
+                Text(String(format: "%.1f", uvService.currentUV))
+                    .font(.system(size: 72, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
             
             HStack(spacing: 15) {
                 VStack(spacing: 3) {
@@ -394,60 +827,127 @@ struct ContentView: View {
     }
     
     private var exposureToggle: some View {
-        Button(action: {
-            // Haptic feedback
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
-        }) {
-            HStack {
-                Image(systemName: vitaminDCalculator.isInSun ? "sun.max.fill" :
-                                 uvService.currentUV == 0 ? moonPhaseIcon() : "sun.max")
-                    .font(.system(size: 24))
-                    .symbolEffect(.pulse, isActive: vitaminDCalculator.isInSun)
+        HStack(spacing: 12) {
+            // Main tracking button
+            Button(action: {
+                // Haptic feedback
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
                 
-                Text(vitaminDCalculator.isInSun ? "End" :
-                     uvService.currentUV == 0 ? "No UV available" : "Begin")
-                    .font(.system(size: 18, weight: .semibold))
+                if vitaminDCalculator.isInSun,
+                   vitaminDCalculator.sessionVitaminD > 0,
+                   let startTime = vitaminDCalculator.sessionStartTime {
+                    // Defer ending the session until after user confirms in the sheet
+                    pendingSessionStartTime = startTime
+                    pendingSessionAmount = vitaminDCalculator.sessionVitaminD
+                    showSessionCompletionSheet = true
+                } else {
+                    vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
+                }
+            }) {
+                HStack {
+                    Image(systemName: vitaminDCalculator.isInSun ? "sun.max.fill" :
+                                     uvService.currentUV == 0 ? moonPhaseIcon() : "sun.max")
+                        .font(.system(size: 24))
+                        .symbolEffect(.pulse, isActive: vitaminDCalculator.isInSun)
+                    
+                    Text(vitaminDCalculator.isInSun ? "End" :
+                         uvService.currentUV == 0 ? "No UV available" : "Begin")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(vitaminDCalculator.isInSun ? Color.yellow.opacity(0.3) : Color.black.opacity(0.2))
+                .cornerRadius(15)
+                .animation(.easeInOut(duration: 0.3), value: vitaminDCalculator.isInSun)
             }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .background(vitaminDCalculator.isInSun ? Color.yellow.opacity(0.3) : Color.black.opacity(0.2))
-            .cornerRadius(15)
-            .animation(.easeInOut(duration: 0.3), value: vitaminDCalculator.isInSun)
+            .disabled(uvService.currentUV == 0 && !vitaminDCalculator.isInSun)
+            .opacity(uvService.currentUV == 0 && !vitaminDCalculator.isInSun ? 0.6 : 1.0)
+            
+            // Manual entry button
+            Button(action: {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+                showManualExposureSheet = true
+            }) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 24))
+                    .foregroundColor(.white)
+                    .frame(width: 60)
+                    .padding(.vertical, 20)
+                    .background(Color.black.opacity(0.2))
+                    .cornerRadius(15)
+            }
+            .disabled(vitaminDCalculator.isInSun) // Can't add manual entry while tracking
+            .opacity(vitaminDCalculator.isInSun ? 0.4 : 1.0)
         }
-        .disabled(uvService.currentUV == 0 && !vitaminDCalculator.isInSun)
-        .opacity(uvService.currentUV == 0 && !vitaminDCalculator.isInSun ? 0.6 : 1.0)
     }
     
     private var clothingSection: some View {
-        Button(action: { showClothingPicker.toggle() }) {
-            VStack(spacing: 10) {
-                Text("CLOTHING")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white.opacity(0.7))
-                    .tracking(1.5)
-                
-                HStack {
-                    Text(vitaminDCalculator.clothingLevel.description)
-                        .font(.system(size: 16, weight: .medium))
+        HStack(spacing: 12) {
+            // Clothing picker
+            Button(action: { showClothingPicker.toggle() }) {
+                VStack(spacing: 10) {
+                    Text("CLOTHING")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .tracking(1.5)
                     
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12))
+                    HStack {
+                        Text(vitaminDCalculator.clothingLevel.description)
+                            .font(.system(size: 16, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.white)
                 }
-                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Color.black.opacity(0.2))
+                .cornerRadius(15)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(Color.black.opacity(0.2))
-            .cornerRadius(15)
-        }
-        .sheet(isPresented: $showClothingPicker) {
-            ClothingPicker(selection: $vitaminDCalculator.clothingLevel)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+            .sheet(isPresented: $showClothingPicker) {
+                ClothingPicker(selection: $vitaminDCalculator.clothingLevel)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+            
+            // Sunscreen picker
+            Button(action: { showSunscreenPicker.toggle() }) {
+                VStack(spacing: 10) {
+                    Text("SUNSCREEN")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .tracking(1.5)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "shield.lefthalf.fill")
+                            .font(.system(size: 12))
+                        
+                        Text(vitaminDCalculator.sunscreenLevel.description)
+                            .font(.system(size: 16, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Color.black.opacity(0.2))
+                .cornerRadius(15)
+            }
+            .sheet(isPresented: $showSunscreenPicker) {
+                SunscreenPicker(selection: $vitaminDCalculator.sunscreenLevel)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
     
@@ -484,6 +984,37 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showInfoSheet) {
             InfoSheet()
+        }
+        .sheet(isPresented: $showManualExposureSheet) {
+            ManualExposureSheet()
+        }
+        .sheet(isPresented: $showSessionCompletionSheet) {
+            if let startTime = pendingSessionStartTime {
+                SessionCompletionSheet(
+                    sessionStartTime: startTime,
+                    sessionAmount: pendingSessionAmount,
+                    onSave: {
+                        // End the session and let existing logic save to Health + SwiftData
+                        vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
+                        // Reset pending state
+                        pendingSessionStartTime = nil
+                        pendingSessionAmount = 0
+                    },
+                    onCancel: {
+                        // Keep tracking; just reset pending state
+                        pendingSessionStartTime = nil
+                        pendingSessionAmount = 0
+                    }
+                )
+                .environmentObject(vitaminDCalculator)
+                .environmentObject(healthManager)
+                .preferredColorScheme(.dark)
+            } else {
+                // Fallback placeholder if for some reason we have no pending data
+                ProgressView()
+                    .tint(.white)
+                    .preferredColorScheme(.dark)
+            }
         }
     }
     
@@ -622,7 +1153,7 @@ struct ContentView: View {
         if uvService.currentMoonPhaseName.isEmpty {
             let defaultPhase = "Waxing Gibbous"
             uvService.currentMoonPhaseName = defaultPhase
-            UserDefaults(suiteName: "group.sunday.widget")?.set(defaultPhase, forKey: "moonPhaseName")
+            UserDefaults(suiteName: "group.daylight.mayank")?.set(defaultPhase, forKey: "moonPhaseName")
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
@@ -657,6 +1188,7 @@ struct ContentView: View {
             // Then reload from HealthKit to ensure accuracy
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 loadTodaysTotal()
+                updateWidgetSharedData()
             }
         }
     }
@@ -664,6 +1196,7 @@ struct ContentView: View {
     private func loadTodaysTotal() {
         healthManager.getTodaysVitaminD { total in
             todaysTotal = total ?? 0
+            updateWidgetSharedData()
         }
     }
     
@@ -804,9 +1337,31 @@ struct ContentView: View {
     
     private func contentFitsInScreen(geometry: GeometryProxy) -> Bool {
         // Estimate content height
-        let estimatedHeight: CGFloat = 40 + 250 + 140 + 70 + 70 + 70 + 40 // header + UV + vitD + button + clothing + skin + padding
+        let estimatedHeight: CGFloat = 40 + 250 + 140 + 70 + 70 + 70 + 40 + 100 + 40 // header + UV + vitD + button + clothing + skin + padding + summary + padding
         let offlineBarHeight: CGFloat = uvService.isOfflineMode ? 50 : 0
         return estimatedHeight + offlineBarHeight < geometry.size.height
+    }
+
+    private func syncPreferencesFromUser() {
+        guard let prefs = userPreferences.first else { return }
+        if let skinType = SkinType(rawValue: prefs.skinType) {
+            vitaminDCalculator.skinType = skinType
+        }
+        if let clothingLevel = ClothingLevel(rawValue: prefs.clothingLevel) {
+            vitaminDCalculator.clothingLevel = clothingLevel
+        }
+        vitaminDCalculator.userAge = prefs.userAge
+        vitaminDCalculator.useAgeFactor = prefs.useAgeFactor
+    }
+    
+    // Helper to update widget shared data
+    private func updateWidgetSharedData() {
+        let sharedDefaults = UserDefaults(suiteName: "group.daylight.mayank")
+        sharedDefaults?.set(uvService.currentUV, forKey: "currentUV")
+        sharedDefaults?.set(todaysTotal + vitaminDCalculator.sessionVitaminD, forKey: "todaysTotal")
+        sharedDefaults?.set(vitaminDCalculator.currentVitaminDRate, forKey: "vitaminDRate")
+        sharedDefaults?.set(vitaminDCalculator.isInSun, forKey: "isTracking")
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 
@@ -934,6 +1489,364 @@ struct SkinTypePicker: View {
     }
 }
 
+struct ManualExposureSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var vitaminDCalculator: VitaminDCalculator
+    @EnvironmentObject var healthManager: HealthManager
+    @EnvironmentObject var uvService: UVService
+    @EnvironmentObject var locationManager: LocationManager
+    @Environment(\.modelContext) private var modelContext
+    
+    @State private var date = Date()
+    @State private var durationMinutes: Double = 20
+    @State private var manualUVIndex: Double = 3.0
+    @State private var clothingLevel: ClothingLevel = .light
+    @State private var sunscreenLevel: SunscreenLevel = .none
+    @State private var isSaving = false
+    @State private var isDetectingUV = false
+    @State private var detectError: String?
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Session details")) {
+                    DatePicker("End time", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                    HStack {
+                        Text("Duration")
+                        Spacer()
+                        Slider(value: $durationMinutes, in: 5...180, step: 5)
+                            .frame(width: 180)
+                        Text("\(Int(durationMinutes)) min")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("UV Index")
+                        Spacer()
+                        Slider(value: $manualUVIndex, in: 0...12, step: 0.5)
+                            .frame(width: 180)
+                        Text(String(format: "%.1f", manualUVIndex))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Location")) {
+                    if let loc = locationManager.location {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(locationManager.locationName.isEmpty ? "Current location" : locationManager.locationName)
+                            Text(String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("Waiting for current location…")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Button {
+                        Task { await detectUVForSelectedTime() }
+                    } label: {
+                        HStack {
+                            if isDetectingUV {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                            Text(isDetectingUV ? "Detecting…" : "Detect UV for this time")
+                        }
+                    }
+                    .disabled(isDetectingUV || locationManager.location == nil)
+                    
+                    if let error = detectError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+                
+                Section(header: Text("Exposure")) {
+                    Picker("Clothing", selection: $clothingLevel) {
+                        ForEach(ClothingLevel.allCases, id: \.self) { level in
+                            Text(level.description).tag(level)
+                        }
+                    }
+                    Picker("Sunscreen", selection: $sunscreenLevel) {
+                        ForEach(SunscreenLevel.allCases, id: \.self) { level in
+                            Text(level.description).tag(level)
+                        }
+                    }
+                }
+                
+                if let previewAmount = previewVitaminD() {
+                    Section(header: Text("Estimated vitamin D")) {
+                        Text("\(Int(previewAmount)) IU")
+                            .font(.headline)
+                    }
+                }
+            }
+            .navigationTitle("Add Sun Session")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving..." : "Save") {
+                        saveSession()
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
+    }
+    
+    private func previewVitaminD() -> Double? {
+        guard durationMinutes > 0, manualUVIndex > 0 else { return nil }
+        return vitaminDCalculator.calculateVitaminD(
+            uvIndex: manualUVIndex,
+            exposureMinutes: durationMinutes,
+            skinType: vitaminDCalculator.skinType,
+            clothingLevel: clothingLevel,
+            sunscreenLevel: sunscreenLevel
+        )
+    }
+    
+    @MainActor
+    private func detectUVForSelectedTime() async {
+        detectError = nil
+        guard !isDetectingUV else { return }
+        guard let location = locationManager.location else {
+            detectError = "No current location available."
+            return
+        }
+        
+        isDetectingUV = true
+        defer { isDetectingUV = false }
+        
+        do {
+            let detected = try await fetchUVIndex(for: location, at: date)
+            manualUVIndex = max(0, min(12, detected))
+        } catch {
+            detectError = "Could not detect UV: \(error.localizedDescription)"
+        }
+    }
+    
+    private func fetchUVIndex(for location: CLLocation, at date: Date) async throws -> Double {
+        let latitude = location.coordinate.latitude
+        let longitude = location.coordinate.longitude
+        let altitude = location.altitude
+        
+        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&elevation=\(altitude)&hourly=uv_index&timezone=auto&forecast_days=2"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+        
+        struct HourlyResponse: Decodable {
+            struct Hourly: Decodable {
+                let time: [String]
+                let uvIndex: [Double]
+                
+                enum CodingKeys: String, CodingKey {
+                    case time
+                    case uvIndex = "uv_index"
+                }
+            }
+            let hourly: Hourly
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let response = try JSONDecoder().decode(HourlyResponse.self, from: data)
+        
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        let startOfTarget = calendar.startOfDay(for: date)
+        let dayOffset = calendar.dateComponents([.day], from: startOfToday, to: startOfTarget).day ?? 0
+        guard dayOffset >= 0, dayOffset <= 1 else {
+            throw NSError(domain: "ManualExposureSheet", code: 1, userInfo: [NSLocalizedDescriptionKey: "Only today and tomorrow are supported."])
+        }
+        
+        let hour = calendar.component(.hour, from: date)
+        let minute = calendar.component(.minute, from: date)
+        let baseIndex = dayOffset * 24 + hour
+        let hourlyUV = response.hourly.uvIndex
+        guard baseIndex < hourlyUV.count else {
+            throw NSError(domain: "ManualExposureSheet", code: 2, userInfo: [NSLocalizedDescriptionKey: "UV data unavailable for this time."])
+        }
+        
+        let currentHourUV = hourlyUV[baseIndex]
+        let interpolationFactor = Double(minute) / 60.0
+        var interpolatedUV = currentHourUV
+        if baseIndex + 1 < hourlyUV.count {
+            let nextHourUV = hourlyUV[baseIndex + 1]
+            interpolatedUV = currentHourUV + (nextHourUV - currentHourUV) * interpolationFactor
+        }
+        
+        return interpolatedUV
+    }
+    
+    private func saveSession() {
+        guard !isSaving else { return }
+        guard let amount = previewVitaminD() else {
+            dismiss()
+            return
+        }
+        
+        isSaving = true
+        
+        let endTime = date
+        let startTime = endTime.addingTimeInterval(-durationMinutes * 60)
+        
+        // Save SwiftData session
+        let session = VitaminDSession(
+            startTime: startTime,
+            endTime: endTime,
+            totalIU: amount,
+            averageUV: manualUVIndex,
+            peakUV: manualUVIndex,
+            clothingLevel: clothingLevel.rawValue,
+            skinType: vitaminDCalculator.skinType.rawValue,
+            userAge: vitaminDCalculator.userAge
+        )
+        
+        modelContext.insert(session)
+        do {
+            try modelContext.save()
+        } catch {
+            // If save fails, just dismiss without crashing
+        }
+        
+        // Save to Health
+        healthManager.saveVitaminD(amount: amount)
+        
+        // Best-effort widget refresh through shared defaults
+        let sharedDefaults = UserDefaults(suiteName: "group.daylight.mayank")
+        let existingTotal = sharedDefaults?.double(forKey: "todaysTotal") ?? 0
+        sharedDefaults?.set(existingTotal + amount, forKey: "todaysTotal")
+        sharedDefaults?.set(uvService.currentUV, forKey: "currentUV")
+        sharedDefaults?.set(vitaminDCalculator.currentVitaminDRate, forKey: "vitaminDRate")
+        sharedDefaults?.set(vitaminDCalculator.isInSun, forKey: "isTracking")
+        WidgetCenter.shared.reloadAllTimelines()
+        
+        dismiss()
+    }
+}
+
+struct SessionCompletionSheet: View {
+    let sessionStartTime: Date
+    let sessionAmount: Double
+    let onSave: () -> Void
+    let onCancel: () -> Void
+    
+    @Environment(\.dismiss) var dismiss
+    
+    private var dateFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }
+    
+    private var durationText: String {
+        let minutes = Int(Date().timeIntervalSince(sessionStartTime) / 60)
+        if minutes <= 0 {
+            return "< 1 min"
+        } else if minutes == 1 {
+            return "1 min"
+        } else {
+            return "\(minutes) mins"
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("End this session?")
+                        .font(.title3.bold())
+                    
+                    Text("We'll save this vitamin D session to your history and Apple Health.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Started")
+                        Spacer()
+                        Text(dateFormatter.string(from: sessionStartTime))
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Duration")
+                        Spacer()
+                        Text(durationText)
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Vitamin D")
+                        Spacer()
+                        Text("\(Int(sessionAmount)) IU")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Complete Session")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave()
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+struct SunscreenPicker: View {
+    @Binding var selection: SunscreenLevel
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(SunscreenLevel.allCases, id: \.self) { level in
+                    Button(action: {
+                        selection = level
+                        dismiss()
+                    }) {
+                        HStack {
+                            Text(level.description)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if selection == level {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Sunscreen")
+            .navigationBarItems(trailing: Button("Done") { dismiss() })
+            .preferredColorScheme(.dark)
+        }
+        .presentationBackground(Color(UIColor.systemBackground).opacity(0.99))
+    }
+}
+
 //extension Color {
 //    init(hex: String) {
 //        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -974,7 +1887,7 @@ struct InfoSheet: View {
                         Text("About")
                             .font(.headline)
                         
-                        Text("Sun Day uses a scientifically-based multi-factor model to estimate vitamin D synthesis from UV exposure.")
+                        Text("Daylight Dose uses a scientifically-based multi-factor model to estimate vitamin D synthesis from UV exposure.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -1122,5 +2035,14 @@ struct FactorRow: View {
                 .fontWeight(.medium)
         }
     }
+}
+
+import UIKit
+struct BlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
 

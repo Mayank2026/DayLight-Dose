@@ -32,7 +32,7 @@ struct Provider: IntentTimelineProvider {
         var entries: [SimpleEntry] = []
         
         // Read from shared UserDefaults
-        let sharedDefaults = UserDefaults(suiteName: "group.sunday.widget")
+        let sharedDefaults = UserDefaults(suiteName: "group.daylight.mayank")
         let uvIndex = sharedDefaults?.double(forKey: "currentUV") ?? 0.0
         let todaysTotal = sharedDefaults?.double(forKey: "todaysTotal") ?? 0.0
         let isTracking = sharedDefaults?.bool(forKey: "isTracking") ?? false
@@ -449,7 +449,7 @@ struct SundayWidget: Widget {
         IntentConfiguration(kind: kind, intent: ConfigurationIntent.self, provider: Provider()) { entry in
             SundayWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Sun Day")
+        .configurationDisplayName("Daylight Dose")
         .description("Track UV and vitamin D intake")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
