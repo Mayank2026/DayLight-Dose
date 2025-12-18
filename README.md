@@ -1,4 +1,12 @@
+<div align="center">
+
 # DayLight Dose
+
+![App Logo](DayLight%20Dose/Assets.xcassets/AppIcon.appiconset/Daylight_Dose-iOS-Default-1024x1024@2x.png)
+
+**Your intelligent companion for safe sun exposure and optimal vitamin D synthesis.**
+
+</div>
 
 **Your intelligent companion for safe sun exposure and optimal vitamin D synthesis.**
 
