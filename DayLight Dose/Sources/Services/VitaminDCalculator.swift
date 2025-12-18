@@ -41,6 +41,37 @@ enum ClothingLevel: Int, CaseIterable {
     }
 }
 
+enum SunscreenLevel: Int, CaseIterable {
+    case none = 0
+    case spf15 = 15
+    case spf30 = 30
+    case spf50 = 50
+    case spf100 = 100
+    
+    var description: String {
+        switch self {
+        case .none: return "No sunscreen"
+        case .spf15: return "SPF 15"
+        case .spf30: return "SPF 30"
+        case .spf50: return "SPF 50"
+        case .spf100: return "SPF 100+"
+        }
+    }
+    
+    /// Fraction of UV that still reaches the skin.
+    /// Values are approximate but aligned with Sunday:
+    /// SPF 15 → ~7% UV, SPF 30 → ~3%, SPF 50 → ~2%, SPF 100+ → ~1%.
+    var uvTransmissionFactor: Double {
+        switch self {
+        case .none: return 1.0
+        case .spf15: return 0.07
+        case .spf30: return 0.03
+        case .spf50: return 0.02
+        case .spf100: return 0.01
+        }
+    }
+}
+
 enum SkinType: Int, CaseIterable {
     case type1 = 1
     case type2 = 2
@@ -77,6 +108,11 @@ class VitaminDCalculator: ObservableObject {
     @Published var clothingLevel: ClothingLevel = .light {
         didSet {
             UserDefaults.standard.set(clothingLevel.rawValue, forKey: "preferredClothingLevel")
+        }
+    }
+    @Published var sunscreenLevel: SunscreenLevel = .none {
+        didSet {
+            UserDefaults.standard.set(sunscreenLevel.rawValue, forKey: "preferredSunscreenLevel")
         }
     }
     @Published var skinType: SkinType = .type3 {
@@ -157,6 +193,11 @@ class VitaminDCalculator: ObservableObject {
         if let savedClothingLevel = UserDefaults.standard.object(forKey: "preferredClothingLevel") as? Int,
            let clothing = ClothingLevel(rawValue: savedClothingLevel) {
             clothingLevel = clothing
+        }
+        
+        if let savedSunscreenLevel = UserDefaults.standard.object(forKey: "preferredSunscreenLevel") as? Int,
+           let sunscreen = SunscreenLevel(rawValue: savedSunscreenLevel) {
+            sunscreenLevel = sunscreen
         }
         
         if let savedSkinType = UserDefaults.standard.object(forKey: "userSkinType") as? Int,
@@ -280,10 +321,14 @@ class VitaminDCalculator: ObservableObject {
         // Full body exposure can reach 30,000-40,000 IU/hr in optimal conditions
         let baseRate = 21000.0
         
+        // Apply sunscreen transmission before feeding UV into the response curve.
+        // This effectively scales down vitamin D production when sunscreen is used.
+        let effectiveUV = max(0, uvIndex * sunscreenLevel.uvTransmissionFactor)
+        
         // UV factor: Michaelis-Menten-like saturation curve
         // More accurate representation of vitamin D synthesis kinetics
         // UV 0 = 0x, UV 3 = 1.25x (50% of max), UV 12 = 2x, UV∞ → 2.5x
-        let uvFactor = (uvIndex * uvMaxFactor) / (uvHalfMax + uvIndex)
+        let uvFactor = (effectiveUV * uvMaxFactor) / (uvHalfMax + effectiveUV)
         
         // Exposure based on clothing coverage
         let exposureFactor = clothingLevel.exposureFactor
@@ -403,7 +448,9 @@ class VitaminDCalculator: ObservableObject {
     }
     
     private func updateMEDExposure(uvIndex: Double) {
-        guard isInSun, uvIndex > 0 else { return }
+        // Use effective UV after sunscreen for burn estimation too.
+        let effectiveUV = uvIndex * sunscreenLevel.uvTransmissionFactor
+        guard isInSun, effectiveUV > 0 else { return }
         
         // MED values at UV 1 (must match UVService values)
         let medTimesAtUV1: [Int: Double] = [
@@ -417,8 +464,8 @@ class VitaminDCalculator: ObservableObject {
         
         guard let medTimeAtUV1 = medTimesAtUV1[skinType.rawValue] else { return }
         
-        // Calculate MED per second at current UV
-        let medMinutesAtCurrentUV = medTimeAtUV1 / uvIndex
+        // Calculate MED per second at current (effective) UV
+        let medMinutesAtCurrentUV = medTimeAtUV1 / effectiveUV
         let medFractionPerSecond = 1.0 / (medMinutesAtCurrentUV * 60.0)
         
         // Accumulate MED exposure
