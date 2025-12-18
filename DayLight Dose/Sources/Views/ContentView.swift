@@ -262,6 +262,7 @@ struct ContentView: View {
     @State private var showClothingPicker = false
     @State private var showSkinTypePicker = false
     @State private var showSunscreenPicker = false
+    @State private var showManualExposureSheet = false
     @State private var todaysTotal: Double = 0
     @State private var currentGradientColors: [Color] = []
     @State private var showInfoSheet = false
@@ -780,32 +781,52 @@ User stats for a personalised sunlight and vitamin D summary:
     }
     
     private var exposureToggle: some View {
-        Button(action: {
-            // Haptic feedback
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
-        }) {
-            HStack {
-                Image(systemName: vitaminDCalculator.isInSun ? "sun.max.fill" :
-                                 uvService.currentUV == 0 ? moonPhaseIcon() : "sun.max")
-                    .font(.system(size: 24))
-                    .symbolEffect(.pulse, isActive: vitaminDCalculator.isInSun)
+        HStack(spacing: 12) {
+            // Main tracking button
+            Button(action: {
+                // Haptic feedback
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
                 
-                Text(vitaminDCalculator.isInSun ? "End" :
-                     uvService.currentUV == 0 ? "No UV available" : "Begin")
-                    .font(.system(size: 18, weight: .semibold))
+                vitaminDCalculator.toggleSunExposure(uvIndex: uvService.currentUV)
+            }) {
+                HStack {
+                    Image(systemName: vitaminDCalculator.isInSun ? "sun.max.fill" :
+                                     uvService.currentUV == 0 ? moonPhaseIcon() : "sun.max")
+                        .font(.system(size: 24))
+                        .symbolEffect(.pulse, isActive: vitaminDCalculator.isInSun)
+                    
+                    Text(vitaminDCalculator.isInSun ? "End" :
+                         uvService.currentUV == 0 ? "No UV available" : "Begin")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(vitaminDCalculator.isInSun ? Color.yellow.opacity(0.3) : Color.black.opacity(0.2))
+                .cornerRadius(15)
+                .animation(.easeInOut(duration: 0.3), value: vitaminDCalculator.isInSun)
             }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .background(vitaminDCalculator.isInSun ? Color.yellow.opacity(0.3) : Color.black.opacity(0.2))
-            .cornerRadius(15)
-            .animation(.easeInOut(duration: 0.3), value: vitaminDCalculator.isInSun)
+            .disabled(uvService.currentUV == 0 && !vitaminDCalculator.isInSun)
+            .opacity(uvService.currentUV == 0 && !vitaminDCalculator.isInSun ? 0.6 : 1.0)
+            
+            // Manual entry button
+            Button(action: {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+                showManualExposureSheet = true
+            }) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 24))
+                    .foregroundColor(.white)
+                    .frame(width: 60)
+                    .padding(.vertical, 20)
+                    .background(Color.black.opacity(0.2))
+                    .cornerRadius(15)
+            }
+            .disabled(vitaminDCalculator.isInSun) // Can't add manual entry while tracking
+            .opacity(vitaminDCalculator.isInSun ? 0.4 : 1.0)
         }
-        .disabled(uvService.currentUV == 0 && !vitaminDCalculator.isInSun)
-        .opacity(uvService.currentUV == 0 && !vitaminDCalculator.isInSun ? 0.6 : 1.0)
     }
     
     private var clothingSection: some View {
@@ -908,6 +929,9 @@ User stats for a personalised sunlight and vitamin D summary:
         }
         .sheet(isPresented: $showInfoSheet) {
             InfoSheet()
+        }
+        .sheet(isPresented: $showManualExposureSheet) {
+            ManualExposureSheet()
         }
     }
     
@@ -1381,6 +1405,136 @@ struct SkinTypePicker: View {
     }
 }
 
+struct ManualExposureSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var vitaminDCalculator: VitaminDCalculator
+    @EnvironmentObject var healthManager: HealthManager
+    @EnvironmentObject var uvService: UVService
+    @Environment(\.modelContext) private var modelContext
+    
+    @State private var date = Date()
+    @State private var durationMinutes: Double = 20
+    @State private var manualUVIndex: Double = 3.0
+    @State private var clothingLevel: ClothingLevel = .light
+    @State private var sunscreenLevel: SunscreenLevel = .none
+    @State private var isSaving = false
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Session details")) {
+                    DatePicker("End time", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                    HStack {
+                        Text("Duration")
+                        Spacer()
+                        Slider(value: $durationMinutes, in: 5...180, step: 5)
+                            .frame(width: 180)
+                        Text("\(Int(durationMinutes)) min")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("UV Index")
+                        Spacer()
+                        Slider(value: $manualUVIndex, in: 0...12, step: 0.5)
+                            .frame(width: 180)
+                        Text(String(format: "%.1f", manualUVIndex))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Exposure")) {
+                    Picker("Clothing", selection: $clothingLevel) {
+                        ForEach(ClothingLevel.allCases, id: \.self) { level in
+                            Text(level.description).tag(level)
+                        }
+                    }
+                    Picker("Sunscreen", selection: $sunscreenLevel) {
+                        ForEach(SunscreenLevel.allCases, id: \.self) { level in
+                            Text(level.description).tag(level)
+                        }
+                    }
+                }
+                
+                if let previewAmount = previewVitaminD() {
+                    Section(header: Text("Estimated vitamin D")) {
+                        Text("\(Int(previewAmount)) IU")
+                            .font(.headline)
+                    }
+                }
+            }
+            .navigationTitle("Add Sun Session")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving..." : "Save") {
+                        saveSession()
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
+    }
+    
+    private func previewVitaminD() -> Double? {
+        guard durationMinutes > 0, manualUVIndex > 0 else { return nil }
+        return vitaminDCalculator.calculateVitaminD(
+            uvIndex: manualUVIndex,
+            exposureMinutes: durationMinutes,
+            skinType: vitaminDCalculator.skinType,
+            clothingLevel: clothingLevel,
+            sunscreenLevel: sunscreenLevel
+        )
+    }
+    
+    private func saveSession() {
+        guard !isSaving else { return }
+        guard let amount = previewVitaminD() else {
+            dismiss()
+            return
+        }
+        
+        isSaving = true
+        
+        let endTime = date
+        let startTime = endTime.addingTimeInterval(-durationMinutes * 60)
+        
+        // Save SwiftData session
+        let session = VitaminDSession(
+            startTime: startTime,
+            endTime: endTime,
+            totalIU: amount,
+            averageUV: manualUVIndex,
+            peakUV: manualUVIndex,
+            clothingLevel: clothingLevel.rawValue,
+            skinType: vitaminDCalculator.skinType.rawValue,
+            userAge: vitaminDCalculator.userAge
+        )
+        
+        modelContext.insert(session)
+        do {
+            try modelContext.save()
+        } catch {
+            // If save fails, just dismiss without crashing
+        }
+        
+        // Save to Health
+        healthManager.saveVitaminD(amount: amount)
+        
+        // Best-effort widget refresh through shared defaults
+        let sharedDefaults = UserDefaults(suiteName: "group.daylight.mayank")
+        let existingTotal = sharedDefaults?.double(forKey: "todaysTotal") ?? 0
+        sharedDefaults?.set(existingTotal + amount, forKey: "todaysTotal")
+        sharedDefaults?.set(uvService.currentUV, forKey: "currentUV")
+        sharedDefaults?.set(vitaminDCalculator.currentVitaminDRate, forKey: "vitaminDRate")
+        sharedDefaults?.set(vitaminDCalculator.isInSun, forKey: "isTracking")
+        WidgetCenter.shared.reloadAllTimelines()
+        
+        dismiss()
+    }
+}
 struct SunscreenPicker: View {
     @Binding var selection: SunscreenLevel
     @Environment(\.dismiss) var dismiss
